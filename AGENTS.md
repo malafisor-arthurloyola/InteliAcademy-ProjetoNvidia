@@ -4,7 +4,7 @@
 
 Antes de executar qualquer tarefa, leia:
 
-docs/NVIDIA_Startup_AI_Radar.md
+InteliAcademy-ProjetoNvidia\ai-agent-system\docs\Projeto_ NVIDIA Startup AI Radar (1).md
 
 Este documento contém:
 
