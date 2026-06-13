@@ -17,6 +17,7 @@ Whenever a skill is created, downloaded, renamed, or removed under `ai-agent-sys
 |---|---|---|---|---|
 | `agent-architecture-audit` | GitHub: `affaan-m/ECC/skills/agent-architecture-audit` at `5b173d2e6c11b976a0f13b2f59125e08956c1d47` | Audits LLM and agent application architecture for wrapper regressions, memory pollution, tool discipline failures, hidden repair loops, and rendering corruption. | Use before releasing or deeply debugging agent/LLM features, especially multi-step workflows with tools, memory, retries, or wrappers. | Installed |
 | `find-skills` | GitHub: `vercel-labs/skills/skills/find-skills` from `main` | Helps discover and install agent skills from the open skills ecosystem. | Use when looking for an existing skill for a domain, tool, workflow, framework, or repeated task. | Installed |
+| `frontend-design` | GitHub: `nexu-io/open-design/skills/frontend-design` from `main` | Guides distinctive, production-grade frontend interfaces with polished UI, layout, typography, accessibility, and working code. | Use when designing the NVIDIA Startup AI Radar dashboard, landing/admin screens, React components, or frontend UX polish. | Installed |
 | `langgraph-nvidia-startup-radar` | Local project skill | Guides LangGraph architecture for the NVIDIA Startup AI Radar multiagent pipeline. | Use when designing, implementing, refactoring, testing, or documenting the Search Planner, Scraper, Extractor, Classifier, Validator, NVIDIA RAG, Recommendation, and Briefing agents. | Created locally |
 | `mcp-builder` | Local copy of Codex skill | Guides creation and evaluation of MCP servers. | Use when the project needs external tools/APIs exposed through Model Context Protocol. | Installed |
 | `skill-creator` | Local copy of Codex skill | Guides creation or update of Codex skills. | Use when formalizing a project workflow, domain rule, or reusable procedure as a skill. | Installed |
@@ -35,3 +36,4 @@ When adding a new skill:
 ## Local Compatibility Notes
 
 - `agent-architecture-audit`: removed unsupported frontmatter keys (`origin`, `tools`) after download so the local validator accepts the skill.
+- `frontend-design`: removed unsupported frontmatter keys (`triggers`, `od`) after download so the local validator accepts the skill.
