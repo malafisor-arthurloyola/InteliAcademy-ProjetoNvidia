@@ -1,5 +1,32 @@
 # AGENTS.md
 
+# AGENTS
+
+Antes de executar qualquer tarefa, leia:
+
+docs/NVIDIA_Startup_AI_Radar.md
+
+Este documento contém:
+
+- Objetivos do projeto
+- Escopo
+- Definições
+- Fontes recomendadas
+- Tecnologias NVIDIA
+- Critérios de classificação
+- Arquitetura conceitual
+- Regras de negócio
+
+Considere esse documento a fonte principal de verdade do projeto.
+
+Ao implementar funcionalidades:
+
+1. Preserve alinhamento com o documento.
+2. Não invente critérios de classificação.
+3. Não invente tecnologias NVIDIA.
+4. Priorize modularidade e rastreabilidade.
+5. Cite fontes sempre que possível.
+
 ## Missão do Projeto
 
 Você está trabalhando no projeto NVIDIA Startup AI Radar.
