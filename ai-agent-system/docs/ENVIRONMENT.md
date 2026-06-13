@@ -2,13 +2,15 @@
 
 This project uses Python for the agent pipeline, API, scraping, extraction, RAG, and recommendation services.
 
-## Recommendation
+## Official Python Version
 
-Use Python 3.11, 3.12, or 3.13 for the project environment when possible. The current machine also has a Python 3.14 virtual environment at the repository root, but some AI and scraping libraries may lag behind the newest Python release.
+Use Python 3.12 as the official project version. It is mature for FastAPI, LangGraph/LangChain, Playwright, Scrapy, PostgreSQL clients, Qdrant, and common RAG tooling.
+
+Python 3.13 can be used temporarily for local development if Python 3.12 is not installed. Avoid Python 3.14 for now because AI and scraping libraries may lag behind the newest Python release.
 
 ## Existing Environment
 
-A virtual environment already exists at:
+If you already have a compatible virtual environment, keep using it. A virtual environment may exist at:
 
 ```powershell
 .\venv
@@ -25,6 +27,15 @@ Check Python and pip:
 ```powershell
 python --version
 python -m pip --version
+```
+
+If the environment reports Python 3.14, recreate it after installing Python 3.12:
+
+```powershell
+Remove-Item -Recurse -Force .\venv
+py -3.12 -m venv venv
+.\venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 ```
 
 ## Install Dependencies
