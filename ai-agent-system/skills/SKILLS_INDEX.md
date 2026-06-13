@@ -20,6 +20,7 @@ Whenever a skill is created, downloaded, renamed, or removed under `ai-agent-sys
 | `frontend-design` | GitHub: `nexu-io/open-design/skills/frontend-design` from `main` | Guides distinctive, production-grade frontend interfaces with polished UI, layout, typography, accessibility, and working code. | Use when designing the NVIDIA Startup AI Radar dashboard, landing/admin screens, React components, or frontend UX polish. | Installed |
 | `langgraph-nvidia-startup-radar` | Local project skill | Guides LangGraph architecture for the NVIDIA Startup AI Radar multiagent pipeline. | Use when designing, implementing, refactoring, testing, or documenting the Search Planner, Scraper, Extractor, Classifier, Validator, NVIDIA RAG, Recommendation, and Briefing agents. | Created locally |
 | `mcp-builder` | Local copy of Codex skill | Guides creation and evaluation of MCP servers. | Use when the project needs external tools/APIs exposed through Model Context Protocol. | Installed |
+| `multi-agent-orchestration` | GitHub: `qodex-ai/ai-agent-skills/skills/multi-agent-orchestration` from `main` | Guides multi-agent system design, including delegation, sequential/parallel workflows, consensus, shared communication, aggregation, and evaluation. | Use when defining how multiple Radar agents collaborate, hand off evidence, run in parallel, validate disagreements, or aggregate outputs into one briefing. | Installed |
 | `skill-creator` | Local copy of Codex skill | Guides creation or update of Codex skills. | Use when formalizing a project workflow, domain rule, or reusable procedure as a skill. | Installed |
 | `skill-installer` | Local copy of Codex skill | Installs skills from curated lists or GitHub paths. | Use when downloading skills into this project or into the Codex global skills directory. | Installed |
 
@@ -37,3 +38,4 @@ When adding a new skill:
 
 - `agent-architecture-audit`: removed unsupported frontmatter keys (`origin`, `tools`) after download so the local validator accepts the skill.
 - `frontend-design`: removed unsupported frontmatter keys (`triggers`, `od`) after download so the local validator accepts the skill.
+- `multi-agent-orchestration`: converted Unicode arrows, box-drawing characters, and checkmarks to ASCII for stable rendering in Windows terminals.
