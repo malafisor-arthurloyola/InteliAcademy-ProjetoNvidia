@@ -19,6 +19,30 @@ Este documento contém:
 
 Considere esse documento a fonte principal de verdade do projeto.
 
+## Estado Operacional Atual
+
+Antes de continuar em um novo chat, leia tambem o handoff unico:
+
+`C:\Users\Inteli\Desktop\Projeto Nvidia\Sessao 2026-06-14 - Handoff para Proximo Agente.md`
+
+Esse arquivo deve ser mantido atualizado no lugar de criar varios handoffs por sessao.
+
+Codigo Python real do projeto deve ficar em:
+
+`InteliAcademy-ProjetoNvidia\ai-agent-system\src\radar\`
+
+Nao recrie scaffolds antigos na raiz de `ai-agent-system` como `agent/`, `api/`, `config/`, `llm/` ou `memory/` sem uma necessidade concreta. Essas bases vazias foram removidas para evitar ambiguidade.
+
+Use sempre o Python do venv do projeto:
+
+`InteliAcademy-ProjetoNvidia\venv\Scripts\python.exe`
+
+Ao documentar aprendizado, explicacoes de codigo, fluxos do LangGraph ou atualizacoes do handoff, use a skill local:
+
+`ai-agent-system\skills\obsidian-learning-notes`
+
+Nao usar APIs externas sem autorizacao explicita do usuario. Nao commitar segredos, `.env`, caches ou o `venv`.
+
 Ao implementar funcionalidades:
 
 1. Preserve alinhamento com o documento.
