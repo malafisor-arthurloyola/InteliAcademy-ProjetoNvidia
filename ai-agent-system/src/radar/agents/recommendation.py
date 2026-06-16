@@ -37,6 +37,14 @@ TECHNOLOGY_GUIDANCE = {
         "complexity": "medium",
         "action": "Map production inference endpoints and evaluate Triton for serving standardization.",
     },
+    "TensorRT-LLM": {
+        "gap": "LLM workload may need lower latency and higher throughput inference optimization.",
+        "technical": "TensorRT-LLM can optimize LLM inference performance with batching and low-latency serving techniques.",
+        "business": "Optimized LLM inference can reduce serving cost and improve responsiveness for AI products.",
+        "priority": "high",
+        "complexity": "high",
+        "action": "Benchmark representative LLM prompts against TensorRT-LLM optimization paths.",
+    },
     "NVIDIA RAPIDS": {
         "gap": "Data-heavy AI workflow may need faster analytics or feature pipeline processing.",
         "technical": "RAPIDS accelerates data science and analytics pipelines on GPUs.",
@@ -44,6 +52,22 @@ TECHNOLOGY_GUIDANCE = {
         "priority": "medium",
         "complexity": "medium",
         "action": "Profile tabular or analytics workloads and identify a RAPIDS proof of concept.",
+    },
+    "cuDF": {
+        "gap": "Tabular or dataframe-heavy workflow may need faster preprocessing.",
+        "technical": "cuDF accelerates dataframe operations on GPUs and can reduce bottlenecks in tabular data preparation.",
+        "business": "Faster dataframe processing can improve iteration speed for analytics-heavy AI products.",
+        "priority": "medium",
+        "complexity": "medium",
+        "action": "Identify dataframe-heavy jobs and compare pandas-style processing against cuDF.",
+    },
+    "cuML": {
+        "gap": "Predictive machine learning workflow may need accelerated model training or experimentation.",
+        "technical": "cuML accelerates classical machine learning algorithms on GPUs.",
+        "business": "Accelerated model experimentation can shorten validation cycles for data-intensive startups.",
+        "priority": "medium",
+        "complexity": "medium",
+        "action": "Review predictive ML workloads and select one cuML-compatible benchmark.",
     },
     "NVIDIA Riva": {
         "gap": "Voice or transcription product may need production-grade speech AI capabilities.",
@@ -60,6 +84,22 @@ TECHNOLOGY_GUIDANCE = {
         "priority": "medium",
         "complexity": "high",
         "action": "Review healthcare use case, compliance needs, and potential Clara alignment.",
+    },
+    "NVIDIA Omniverse": {
+        "gap": "Simulation or digital twin workflow may need a stronger 3D collaboration and simulation layer.",
+        "technical": "Omniverse supports simulation, 3D workflows, and digital twins for industrial environments.",
+        "business": "Better simulation can reduce physical testing cost and speed up robotics or industrial validation.",
+        "priority": "medium",
+        "complexity": "high",
+        "action": "Map simulation assets and evaluate where Omniverse could support digital twin workflows.",
+    },
+    "NVIDIA Isaac": {
+        "gap": "Robotics or autonomy workflow may need NVIDIA tooling for simulation and deployment.",
+        "technical": "Isaac supports robotics simulation, autonomy, and robot development workflows.",
+        "business": "Robotics-specific tooling can improve validation speed and reduce deployment risk.",
+        "priority": "medium",
+        "complexity": "high",
+        "action": "Review robotics autonomy stack and identify a simulation or deployment proof of concept with Isaac.",
     },
 }
 
@@ -105,7 +145,7 @@ def _build_gap(
     description: str,
     evidence_ids: list[str],
 ) -> TechnicalGap:
-    severity = "high" if chunk.technology in {"NVIDIA NIM", "NeMo Guardrails"} else "medium"
+    severity = "high" if chunk.technology in {"NVIDIA NIM", "NeMo Guardrails", "TensorRT-LLM"} else "medium"
     return TechnicalGap(
         description=description,
         evidence_ids=evidence_ids,
