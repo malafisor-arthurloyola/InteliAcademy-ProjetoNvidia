@@ -8,6 +8,15 @@ from radar.scraping.normalizers import (
     normalize_collected_page_payload,
     normalize_search_result_payloads,
 )
+from radar.settings import RadarSettings, get_settings
+
+
+class ExternalProviderDisabledError(RuntimeError):
+    """Raised when code tries to use external providers while offline mode is active."""
+
+
+class ExternalProviderCredentialsError(RuntimeError):
+    """Raised when an enabled external provider has no configured credentials."""
 
 
 class SerpApiSearchAdapter:
@@ -51,6 +60,40 @@ class PageContentAdapter:
         )
 
 
+class ConfiguredSerpApiSearchAdapter:
+    """Boundary for future SerpAPI calls, disabled unless explicitly configured."""
+
+    provider = "serpapi"
+
+    def __init__(self, settings: RadarSettings | None = None) -> None:
+        self._settings = settings or get_settings()
+
+    def search(self, plan: SearchPlan) -> list[SourceCandidate]:
+        _ensure_external_provider_enabled(self._settings, self.provider)
+        _ensure_api_key(self._settings.serpapi_api_key, self.provider)
+        raise NotImplementedError(
+            "SerpAPI network calls are intentionally not implemented until external "
+            "API usage is explicitly authorized."
+        )
+
+
+class ConfiguredFirecrawlPageAdapter:
+    """Boundary for future Firecrawl page extraction, disabled by default."""
+
+    provider = "firecrawl"
+
+    def __init__(self, settings: RadarSettings | None = None) -> None:
+        self._settings = settings or get_settings()
+
+    def fetch(self, candidate: SourceCandidate) -> SourceDocument:
+        _ensure_external_provider_enabled(self._settings, self.provider)
+        _ensure_api_key(self._settings.firecrawl_api_key, self.provider)
+        raise NotImplementedError(
+            "Firecrawl network calls are intentionally not implemented until external "
+            "API usage is explicitly authorized."
+        )
+
+
 def _extract_search_results(
     payload: Mapping[str, Any] | Sequence[Mapping[str, Any]],
 ) -> list[Mapping[str, Any]]:
@@ -60,3 +103,18 @@ def _extract_search_results(
             return [result for result in organic_results if isinstance(result, Mapping)]
         return [payload]
     return [result for result in payload if isinstance(result, Mapping)]
+
+
+def _ensure_external_provider_enabled(settings: RadarSettings, provider: str) -> None:
+    if not settings.enable_external_providers:
+        raise ExternalProviderDisabledError(
+            f"{provider} is disabled. Set RADAR_ENABLE_EXTERNAL_PROVIDERS=true only "
+            "after explicit authorization to use external APIs."
+        )
+
+
+def _ensure_api_key(api_key: str | None, provider: str) -> None:
+    if not api_key:
+        raise ExternalProviderCredentialsError(
+            f"{provider} is enabled but no API key was configured."
+        )
