@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Protocol
 
-from radar.schemas import SearchPlan, SourceDocument
+from radar.schemas import SearchPlan, SourceCandidate, SourceDocument
 from radar.scraping.normalizers import normalize_source_payloads
 
 
@@ -11,6 +12,26 @@ class WebCollector(ABC):
     def collect(self, plan: SearchPlan) -> list[SourceDocument]:
         """Collect public documents for a search plan."""
 
+class SearchProvider(Protocol):
+    def search(self, plan: SearchPlan) -> list[SourceCandidate]:
+        """Return candidate URLs for a search plan."""
+
+
+class PageProvider(Protocol):
+    def fetch(self, candidate: SourceCandidate) -> SourceDocument:
+        """Return a normalized source document for a candidate URL."""
+
+
+class SearchBackedCollector(WebCollector):
+    """Collector that composes a search adapter with a page-content adapter."""
+
+    def __init__(self, search_provider: SearchProvider, page_provider: PageProvider) -> None:
+        self._search_provider = search_provider
+        self._page_provider = page_provider
+
+    def collect(self, plan: SearchPlan) -> list[SourceDocument]:
+        candidates = self._search_provider.search(plan)
+        return [self._page_provider.fetch(candidate) for candidate in candidates]
 
 class StaticSeedCollector(WebCollector):
     """Deterministic collector used until real web adapters are added."""
@@ -186,3 +207,5 @@ def _latency_payloads() -> list[dict[str, str]]:
             ),
         },
     ]
+
+
