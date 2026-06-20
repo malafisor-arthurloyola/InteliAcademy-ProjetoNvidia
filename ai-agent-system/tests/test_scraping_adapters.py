@@ -5,8 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from radar.schemas import SearchPlan
+from radar.schemas import PipelineError, SearchPlan
 from radar.scraping.adapters import PageContentAdapter, SerpApiSearchAdapter
+from radar.graph.nodes import scraper_node
 from radar.scraping.collectors import SearchBackedCollector
 
 
@@ -65,6 +66,49 @@ def test_search_backed_collector_composes_search_and_page_adapters() -> None:
     assert [source.source_type for source in sources] == ["official_site", "news"]
     assert all(source.text for source in sources)
 
+
+def test_search_backed_collector_keeps_successes_when_one_page_fails() -> None:
+    page_payloads = _load_fixture("page_payloads_ai_startups.json")
+    page_payloads.pop("https://news.example.com/example-ai-platform")
+    collector = SearchBackedCollector(
+        search_provider=SerpApiSearchAdapter(_load_fixture("serpapi_ai_startups.json")),
+        page_provider=PageContentAdapter(page_payloads),
+    )
+
+    sources, errors = collector.collect_with_errors(_search_plan())
+
+    assert len(sources) == 1
+    assert len(errors) == 1
+    assert errors[0].step == "scraper.fetch"
+    assert errors[0].source_url == "https://news.example.com/example-ai-platform"
+    assert errors[0].provider == "PageContentAdapter"
+    assert errors[0].recoverable is True
+
+
+def test_scraper_node_records_collection_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_collect_sources_with_errors(state):
+        return [], [
+            PipelineError(
+                step="scraper.fetch",
+                message="fixture missing",
+                recoverable=True,
+                source_url="https://example.com/missing",
+                provider="fixture",
+                error_type="ValueError",
+            )
+        ]
+
+    monkeypatch.setattr(
+        "radar.graph.nodes.collect_sources_with_errors",
+        fake_collect_sources_with_errors,
+    )
+
+    update = scraper_node({"search_plan": _search_plan(), "collection_attempts": 0})
+
+    assert update["sources"] == []
+    assert update["collection_attempts"] == 1
+    assert update["review_required"] is True
+    assert update["errors"][0].source_url == "https://example.com/missing"
 
 def _search_plan() -> SearchPlan:
     return SearchPlan(

@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Protocol
 
-from radar.schemas import SearchPlan, SourceCandidate, SourceDocument
+from radar.schemas import PipelineError, SearchPlan, SourceCandidate, SourceDocument
 from radar.scraping.normalizers import normalize_source_payloads
 
 
@@ -30,8 +30,47 @@ class SearchBackedCollector(WebCollector):
         self._page_provider = page_provider
 
     def collect(self, plan: SearchPlan) -> list[SourceDocument]:
-        candidates = self._search_provider.search(plan)
-        return [self._page_provider.fetch(candidate) for candidate in candidates]
+        sources, errors = self.collect_with_errors(plan)
+        if errors and not sources:
+            raise RuntimeError(errors[0].message)
+        return sources
+
+    def collect_with_errors(self, plan: SearchPlan) -> tuple[list[SourceDocument], list[PipelineError]]:
+        try:
+            candidates = self._search_provider.search(plan)
+        except Exception as exc:
+            return [], [
+                PipelineError(
+                    step="scraper.search",
+                    message=str(exc),
+                    recoverable=True,
+                    provider=_provider_name(self._search_provider),
+                    error_type=type(exc).__name__,
+                )
+            ]
+
+        sources: list[SourceDocument] = []
+        errors: list[PipelineError] = []
+        for candidate in candidates:
+            try:
+                sources.append(self._page_provider.fetch(candidate))
+            except Exception as exc:
+                errors.append(
+                    PipelineError(
+                        step="scraper.fetch",
+                        message=str(exc),
+                        recoverable=True,
+                        source_url=str(candidate.url),
+                        provider=_provider_name(self._page_provider),
+                        error_type=type(exc).__name__,
+                    )
+                )
+        return sources, errors
+
+
+def _provider_name(provider: object) -> str:
+    return str(getattr(provider, "provider", provider.__class__.__name__))
+
 
 class StaticSeedCollector(WebCollector):
     """Deterministic collector used until real web adapters are added."""
