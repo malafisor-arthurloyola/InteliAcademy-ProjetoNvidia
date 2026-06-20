@@ -48,6 +48,39 @@ Ao documentar aprendizado, explicacoes de codigo, fluxos do LangGraph ou atualiz
 
 Nao usar APIs externas sem autorizacao explicita do usuario. Nao commitar segredos, `.env`, caches ou o `venv`.
 
+## Safety Switch para APIs Externas
+
+APIs externas estao protegidas por uma camada fail-closed:
+
+```python
+# src/radar/settings.py
+RADAR_ENABLE_EXTERNAL_PROVIDERS=false  # mude para true apenas com autorizacao
+RADAR_SEARCH_PROVIDER=fixture          # ou "serpapi"
+RADAR_PAGE_PROVIDER=fixture            # ou "firecrawl"
+```
+
+Se algum código tentar usar provedor externo sem habilitar, levanta:
+- `ExternalProviderDisabledError` (se RADAR_ENABLE_EXTERNAL_PROVIDERS=false)
+- `ExternalProviderCredentialsError` (se habilitado mas sem API key)
+
+ConfiguredSerpApiSearchAdapter e ConfiguredFirecrawlPageAdapter em
+`src/radar/scraping/adapters.py` implementam esse padrao.
+
+Nao remover os adapters mockados/fixture — eles sao a bancada de testes
+permanente do projeto.
+
+## Ordem Alinhada de Implementacao
+
+```text
+Fase 1: Scraping real (RADAR_ENABLE_EXTERNAL_PROVIDERS=true)
+Fase 2: LLM no Extractor e Classifier
+Fase 3: RAG NVIDIA real (Qdrant)
+Fase 4: Persistencia (SQLite) e frontend
+```
+
+Scraping real primeiro porque dados reais validam os schemas antes de IA
+tentar interpretar. Placeholders continuam existindo como mocks de teste.
+
 Ao implementar funcionalidades:
 
 1. Preserve alinhamento com o documento.
@@ -307,33 +340,46 @@ Preferência:
 
 ---
 
-## Estrutura Desejada
+## Estrutura Atual do Codigo
 
-src/
+```text
+ai-agent-system/src/radar/
+  agents/           # agentes como arquivos planos (search_planner.py, scraper.py, ...)
+  api/              # FastAPI (health + /runs)
+  database/         # placeholder para SQLite
+  graph/            # state, nodes, edges, builder, retry_policy
+  rag/              # placeholder para Qdrant real
+  schemas/          # contratos Pydantic (base, search, evidence, startup, pipeline, recommendation, briefing)
+  scraping/         # collectors, normalizers, adapters
+  services/         # placeholder
+  utils/            # placeholder
+```
 
-agents/
-search_planner/
-scraper/
-extractor/
-classifier/
-validator/
-rag/
-recommendation/
-briefing/
+## Historico de Progresso
 
-database/
+O diario completo do que foi feito em cada sessao esta em:
 
-api/
+```text
+InteliAcademy-ProjetoNvidia\Documents\Relatorio de Progresso.md
+```
 
-schemas/
+Esse arquivo contem todos os dias de desenvolvimento, arquivos alterados,
+validacoes, notas de aprendizado criadas e commits. Consulte antes de
+comecar uma nova tarefa para saber o que ja foi tentado.
 
-services/
+## Comandos uteis
 
-scraping/
+```powershell
+# Rodar testes
+cd ai-agent-system
+..\venv\Scripts\python.exe -m pytest
 
-rag/
+# Lint
+..\venv\Scripts\python.exe -m ruff check src/radar/ tests/
 
-utils/
+# Ver ultimo commit
+git log -1 --oneline
+```
 
 ---
 
