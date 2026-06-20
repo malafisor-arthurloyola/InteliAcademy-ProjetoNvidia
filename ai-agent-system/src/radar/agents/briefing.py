@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from radar.schemas import ExecutiveBriefing
+from radar.graph.retry_policy import MAX_COLLECTION_ATTEMPTS, has_collection_retry_limit_reached
 from radar.graph.state import RadarState
+from radar.schemas import ExecutiveBriefing
 
 
 def generate_briefing(state: RadarState) -> ExecutiveBriefing:
@@ -14,6 +15,10 @@ def generate_briefing(state: RadarState) -> ExecutiveBriefing:
     caveats = []
     if validation and not validation.has_minimum_evidence:
         caveats.append("Insufficient validated public evidence for recommendations.")
+    if has_collection_retry_limit_reached(state):
+        caveats.append(
+            f"Collection retry limit reached after {MAX_COLLECTION_ATTEMPTS} attempts."
+        )
     caveats.extend(_collection_error_caveats(state))
 
     return ExecutiveBriefing(
@@ -34,5 +39,7 @@ def _collection_error_caveats(state: RadarState) -> list[str]:
             continue
         location = f" for {error.source_url}" if error.source_url else ""
         provider = f" via {error.provider}" if error.provider else ""
-        caveats.append(f"Collection warning at {error.step}{location}{provider}: {error.message}")
+        caveats.append(
+            f"Collection warning at {error.step}{location}{provider}: {error.message}"
+        )
     return caveats

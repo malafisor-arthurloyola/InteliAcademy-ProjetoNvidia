@@ -1,18 +1,14 @@
 from __future__ import annotations
 
+from radar.graph.retry_policy import should_retry_collection
 from radar.graph.state import RadarState
-
-
-MAX_COLLECTION_ATTEMPTS = 2
 
 
 def route_after_validation(state: RadarState) -> str:
     validation = state.get("validation")
-    attempts = state.get("collection_attempts", 0)
-
     if validation and validation.has_minimum_evidence:
         return "classifier"
-    if attempts < MAX_COLLECTION_ATTEMPTS:
+    if should_retry_collection(state):
         return "scraper"
     return "briefing"
 
