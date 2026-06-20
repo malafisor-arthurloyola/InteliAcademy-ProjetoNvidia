@@ -24,6 +24,7 @@ Whenever a skill is created, downloaded, renamed, or removed under `ai-agent-sys
 | `obsidian-learning-notes` | Local project skill | Keeps the Obsidian vault as a beginner-friendly study notebook with code explanations, adjacent-step flow diagrams, graph loops, learning MOCs, and the single living handoff. | Use when documenting project progress, explaining code, updating learning notes, drawing LangGraph/pipeline flows, or refreshing the handoff for future agents. | Created locally |
 | `skill-creator` | Local copy of Codex skill | Guides creation or update of Codex skills. | Use when formalizing a project workflow, domain rule, or reusable procedure as a skill. | Installed |
 | `skill-installer` | Local copy of Codex skill | Installs skills from curated lists or GitHub paths. | Use when downloading skills into this project or into the Codex global skills directory. | Installed |
+| `windows-powershell-repo-hygiene` | Local project skill | Keeps Windows/PowerShell edits, encoding, venv validation, git staging, commits, and pushes safe when the sandbox or shell path is involved. | Use when recovering from Windows sandbox failures, editing with PowerShell, checking encoding/BOM issues, running venv tests, or preparing git commits/pushes. | Created locally |
 
 ## Maintenance Checklist
 

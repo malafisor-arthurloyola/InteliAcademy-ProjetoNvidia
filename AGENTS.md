@@ -37,6 +37,11 @@ Use sempre o Python do venv do projeto:
 
 `InteliAcademy-ProjetoNvidia\venv\Scripts\python.exe`
 
+
+Ao lidar com falhas do sandbox Windows, edicoes via PowerShell, encoding, validacao com venv ou higiene de git, use a skill local:
+
+`ai-agent-system\skills\windows-powershell-repo-hygiene`
+
 Ao documentar aprendizado, explicacoes de codigo, fluxos do LangGraph ou atualizacoes do handoff, use a skill local:
 
 `ai-agent-system\skills\obsidian-learning-notes`
