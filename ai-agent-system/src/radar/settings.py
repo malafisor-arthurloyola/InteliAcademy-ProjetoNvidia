@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 ProviderMode = Literal["fixture", "external"]
-SearchProviderName = Literal["fixture", "serpapi"]
+SearchProviderName = Literal["fixture", "serpapi", "firecrawl"]
 PageProviderName = Literal["fixture", "firecrawl"]
 
 
@@ -17,6 +17,7 @@ class RadarSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=".env",
+        env_file_encoding="utf-8",
         env_prefix="RADAR_",
         extra="ignore",
         populate_by_name=True,

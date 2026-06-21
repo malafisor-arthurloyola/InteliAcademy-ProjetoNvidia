@@ -50,6 +50,9 @@ def inspect_provider_setup(settings: RadarSettings | None = None) -> ProviderPre
     if search_provider == "serpapi" and page_provider == "firecrawl":
         return _inspect_external_stack(active_settings)
 
+    if search_provider == "firecrawl" and page_provider == "firecrawl":
+        return _inspect_external_stack(active_settings)
+
     return ProviderPreflight(
         status="misconfigured",
         search_provider=search_provider,
@@ -58,13 +61,13 @@ def inspect_provider_setup(settings: RadarSettings | None = None) -> ProviderPre
         network_required=search_provider != "fixture" or page_provider != "fixture",
         messages=(
             "Unsupported provider combination. Use fixture/fixture for offline tests "
-            "or serpapi/firecrawl for the controlled external stack.",
+            "or firecrawl/firecrawl for the controlled external stack.",
         ),
     )
 
 
 def _inspect_external_stack(settings: RadarSettings) -> ProviderPreflight:
-    missing_credentials = _missing_external_credentials(settings)
+    missing_credentials = _missing_external_credentials(settings, settings.search_provider, settings.page_provider)
     if not settings.enable_external_providers:
         return ProviderPreflight(
             status="blocked",
@@ -103,10 +106,10 @@ def _inspect_external_stack(settings: RadarSettings) -> ProviderPreflight:
     )
 
 
-def _missing_external_credentials(settings: RadarSettings) -> tuple[str, ...]:
+def _missing_external_credentials(settings: RadarSettings, search_provider: str, page_provider: str) -> tuple[str, ...]:
     missing: list[str] = []
-    if not settings.serpapi_api_key:
+    if search_provider == "serpapi" and not settings.serpapi_api_key:
         missing.append("SERPAPI_API_KEY")
-    if not settings.firecrawl_api_key:
+    if not settings.firecrawl_api_key and (search_provider == "firecrawl" or page_provider == "firecrawl"):
         missing.append("FIRECRAWL_API_KEY")
     return tuple(missing)

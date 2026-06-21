@@ -71,3 +71,31 @@ def test_mixed_provider_stack_is_misconfigured() -> None:
     assert preflight.page_provider == "fixture"
     assert preflight.network_required is True
     assert "Unsupported provider combination" in preflight.messages[0]
+
+
+def test_firecrawl_firecrawl_stack_is_blocked_until_user_authorizes() -> None:
+    preflight = inspect_provider_setup(
+        RadarSettings(search_provider="firecrawl", page_provider="firecrawl")
+    )
+
+    assert preflight.status == "blocked"
+    assert preflight.network_required is True
+    assert preflight.external_providers_enabled is False
+    assert preflight.requires_user_authorization is True
+    assert preflight.missing_credentials == ("FIRECRAWL_API_KEY",)
+
+
+def test_firecrawl_firecrawl_stack_ready_when_authorized_with_key() -> None:
+    preflight = inspect_provider_setup(
+        RadarSettings(
+            enable_external_providers=True,
+            search_provider="firecrawl",
+            page_provider="firecrawl",
+            firecrawl_api_key="test-firecrawl-key",
+        )
+    )
+
+    assert preflight.status == "ready"
+    assert preflight.network_required is True
+    assert preflight.can_collect_without_network is False
+    assert preflight.missing_credentials == ()

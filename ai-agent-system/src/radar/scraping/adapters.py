@@ -116,8 +116,44 @@ class ConfiguredSerpApiSearchAdapter:
         )
 
 
-class ConfiguredFirecrawlPageAdapter:
-    """Boundary for future Firecrawl page extraction, disabled by default."""
+class FirecrawlSearchAdapter:
+    """Search the web via Firecrawl's search API."""
+
+    provider = "firecrawl"
+
+    def __init__(self, settings: RadarSettings | None = None) -> None:
+        self._settings = settings or get_settings()
+
+    def search(self, plan: SearchPlan) -> list[SourceCandidate]:
+        _ensure_external_provider_enabled(self._settings, self.provider)
+        _ensure_api_key(self._settings.firecrawl_api_key, self.provider)
+
+        from firecrawl import Firecrawl
+
+        client = Firecrawl(api_key=self._settings.firecrawl_api_key)
+        response = client.search(
+            query=plan.query,
+            origin="api",
+            limit=10,
+        )
+
+        raw_results = response.get("data", [])
+        candidates = []
+        for i, item in enumerate(raw_results):
+            url = item.get("url") or item.get("link")
+            if not url:
+                continue
+            candidates.append(
+                _firecrawl_result_to_candidate(item, url, i + 1)
+            )
+        return normalize_search_result_payloads(
+            [_candidate_to_payload(c) for c in candidates],
+            provider=self.provider,
+        )
+
+
+class FirecrawlPageAdapter:
+    """Fetch page content via Firecrawl's scrape API."""
 
     provider = "firecrawl"
 
@@ -127,9 +163,41 @@ class ConfiguredFirecrawlPageAdapter:
     def fetch(self, candidate: SourceCandidate) -> SourceDocument:
         _ensure_external_provider_enabled(self._settings, self.provider)
         _ensure_api_key(self._settings.firecrawl_api_key, self.provider)
-        raise NotImplementedError(
-            "Firecrawl network calls are intentionally not implemented until external "
-            "API usage is explicitly authorized."
+
+        from firecrawl import Firecrawl
+
+        client = Firecrawl(api_key=self._settings.firecrawl_api_key)
+        response = client.scrape_url(
+            url=str(candidate.url),
+            formats=["markdown", "rawHtml"],
+            only_main_content=True,
+        )
+
+        data = response.get("data", {})
+        markdown = data.get("markdown", "")
+        raw_html = data.get("rawHtml", "")
+
+        if not markdown and raw_html:
+            _, text = _extract_html_text(raw_html)
+        else:
+            text = markdown or ""
+
+        title = (
+            data.get("metadata", {}).get("title")
+            or data.get("title")
+            or candidate.title
+        )
+
+        payload = {
+            "url": str(candidate.url),
+            "title": title,
+            "text": text,
+            "source_type": _infer_source_type(candidate),
+        }
+        return normalize_collected_page_payload(
+            payload,
+            collection_method="firecrawl_scrape",
+            candidate=candidate,
         )
 
 
@@ -180,3 +248,45 @@ def _ensure_api_key(api_key: str | None, provider: str) -> None:
         raise ExternalProviderCredentialsError(
             f"{provider} is enabled but no API key was configured."
         )
+
+
+def _firecrawl_result_to_candidate(item: dict, url: str, rank: int) -> dict:
+    return {
+        "url": url,
+        "title": item.get("title", ""),
+        "description": item.get("description", "") or item.get("snippet", ""),
+        "source_type": _infer_source_type_from_url(url),
+        "rank": rank,
+    }
+
+
+def _candidate_to_payload(candidate: dict) -> dict:
+    return {
+        "link": candidate["url"],
+        "title": candidate["title"],
+        "snippet": candidate["description"],
+        "kind": candidate.get("source_type", "other"),
+    }
+
+
+def _infer_source_type(candidate: SourceCandidate) -> str:
+    """Infer source type from candidate metadata."""
+    raw = candidate.raw or {}
+    return raw.get("source_type", "other")
+
+
+def _infer_source_type_from_url(url: str) -> str:
+    url_lower = url.lower()
+    if any(d in url_lower for d in ("crunchbase", "pitchbook", "startupbase", "distrito")):
+        return "startup_directory"
+    if any(d in url_lower for d in ("linkedin", "glassdoor")):
+        return "careers"
+    if any(n in url_lower for n in ("g1.", "globo", "valor", "forbes", "infomoney", "startups")):
+        return "news"
+    if "nvidia" in url_lower:
+        return "nvidia_documentation"
+    if any(b in url_lower for b in ("blog.", "/blog", "medium.com")):
+        return "blog"
+    if any(j in url_lower for j in ("/sobre", "/about", "/quem-somos")):
+        return "official_site"
+    return "other"

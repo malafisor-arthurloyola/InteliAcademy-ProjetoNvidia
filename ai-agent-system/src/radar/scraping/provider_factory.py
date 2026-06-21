@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from radar.scraping.adapters import (
-    ConfiguredFirecrawlPageAdapter,
-    ConfiguredSerpApiSearchAdapter,
+    FirecrawlPageAdapter,
+    FirecrawlSearchAdapter,
 )
 from radar.scraping.collectors import SearchBackedCollector, StaticSeedCollector, WebCollector
 from radar.settings import RadarSettings, get_settings
@@ -19,17 +19,25 @@ def build_web_collector(settings: RadarSettings | None = None) -> WebCollector:
     if _uses_fixture_stack(active_settings):
         return StaticSeedCollector()
 
+    if active_settings.search_provider == "firecrawl" and active_settings.page_provider == "firecrawl":
+        return SearchBackedCollector(
+            search_provider=FirecrawlSearchAdapter(settings=active_settings),
+            page_provider=FirecrawlPageAdapter(settings=active_settings),
+        )
+
     if active_settings.search_provider == "serpapi" and active_settings.page_provider == "firecrawl":
+        from radar.scraping.adapters import ConfiguredSerpApiSearchAdapter
+
         return SearchBackedCollector(
             search_provider=ConfiguredSerpApiSearchAdapter(settings=active_settings),
-            page_provider=ConfiguredFirecrawlPageAdapter(settings=active_settings),
+            page_provider=FirecrawlPageAdapter(settings=active_settings),
         )
 
     raise ProviderSelectionError(
         "Unsupported provider combination: "
         f"search_provider={active_settings.search_provider}, "
         f"page_provider={active_settings.page_provider}. "
-        "Use fixture/fixture for offline tests or serpapi/firecrawl for external collection."
+        "Use fixture/fixture for offline tests or firecrawl/firecrawl for external collection."
     )
 
 

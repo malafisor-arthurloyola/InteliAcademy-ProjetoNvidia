@@ -4,10 +4,10 @@ import pytest
 
 from radar.schemas import SearchPlan
 from radar.scraping.adapters import (
-    ConfiguredFirecrawlPageAdapter,
     ConfiguredSerpApiSearchAdapter,
     ExternalProviderCredentialsError,
     ExternalProviderDisabledError,
+    FirecrawlPageAdapter,
     SerpApiSearchAdapter,
 )
 from radar.settings import RadarSettings
@@ -33,7 +33,7 @@ def test_configured_firecrawl_adapter_fails_closed_without_external_authorizatio
     candidate = SerpApiSearchAdapter(
         [{"url": "https://example.com", "title": "Example", "snippet": "AI startup"}]
     ).search(_search_plan())[0]
-    adapter = ConfiguredFirecrawlPageAdapter(settings=RadarSettings())
+    adapter = FirecrawlPageAdapter(settings=RadarSettings())
 
     with pytest.raises(ExternalProviderDisabledError, match="explicit authorization"):
         adapter.fetch(candidate)
