@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from bs4 import BeautifulSoup
+
 from radar.schemas import SearchPlan, SourceCandidate, SourceDocument
 from radar.scraping.normalizers import (
     normalize_collected_page_payload,
@@ -28,7 +30,9 @@ class SerpApiSearchAdapter:
 
     provider = "serpapi"
 
-    def __init__(self, payload: Mapping[str, Any] | Sequence[Mapping[str, Any]]) -> None:
+    def __init__(
+        self, payload: Mapping[str, Any] | Sequence[Mapping[str, Any]]
+    ) -> None:
         self._payload = payload
 
     def search(self, plan: SearchPlan) -> list[SourceCandidate]:
@@ -55,6 +59,41 @@ class PageContentAdapter:
             raise ValueError(f"No fixture page payload found for URL: {url}")
         return normalize_collected_page_payload(
             payload,
+            collection_method=self._collection_method,
+            candidate=candidate,
+        )
+
+
+class HtmlPageContentAdapter:
+    """Adapt locally available raw HTML into source documents without network calls."""
+
+    def __init__(
+        self,
+        payloads_by_url: Mapping[str, Mapping[str, Any]],
+        *,
+        collection_method: str = "offline_html_page",
+    ) -> None:
+        self._payloads_by_url = dict(payloads_by_url)
+        self._collection_method = collection_method
+
+    def fetch(self, candidate: SourceCandidate) -> SourceDocument:
+        url = str(candidate.url)
+        payload = self._payloads_by_url.get(url)
+        if payload is None:
+            raise ValueError(f"No raw HTML page payload found for URL: {url}")
+
+        html = _first_payload_text(payload, ("html", "raw_html", "content"))
+        if html is None:
+            raise ValueError("Raw HTML page payload must include an html field.")
+
+        title, text = _extract_html_text(html)
+        return normalize_collected_page_payload(
+            {
+                "url": url,
+                "title": _first_payload_text(payload, ("title", "name", "headline"))
+                or title,
+                "text": text,
+            },
             collection_method=self._collection_method,
             candidate=candidate,
         )
@@ -92,6 +131,29 @@ class ConfiguredFirecrawlPageAdapter:
             "Firecrawl network calls are intentionally not implemented until external "
             "API usage is explicitly authorized."
         )
+
+
+def _first_payload_text(
+    payload: Mapping[str, Any], keys: tuple[str, ...]
+) -> str | None:
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _extract_html_text(html: str) -> tuple[str | None, str]:
+    soup = BeautifulSoup(html, "html.parser")
+    for noisy_tag in soup(("script", "style", "noscript")):
+        noisy_tag.decompose()
+
+    title = soup.title.string.strip() if soup.title and soup.title.string else None
+    lines = [line.strip() for line in soup.get_text(separator="\n").splitlines()]
+    text = "\n".join(line for line in lines if line)
+    if not text:
+        raise ValueError("Raw HTML page payload must include readable text content.")
+    return title, text
 
 
 def _extract_search_results(

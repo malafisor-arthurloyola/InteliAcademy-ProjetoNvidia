@@ -6,7 +6,11 @@ from pathlib import Path
 import pytest
 
 from radar.schemas import PipelineError, SearchPlan
-from radar.scraping.adapters import PageContentAdapter, SerpApiSearchAdapter
+from radar.scraping.adapters import (
+    HtmlPageContentAdapter,
+    PageContentAdapter,
+    SerpApiSearchAdapter,
+)
 from radar.graph.nodes import scraper_node
 from radar.scraping.collectors import SearchBackedCollector
 
@@ -45,6 +49,41 @@ def test_page_content_adapter_uses_candidate_metadata() -> None:
     assert source.collection_method == "fixture_page_content"
 
 
+def test_html_page_content_adapter_extracts_readable_text_without_network() -> None:
+    search_adapter = SerpApiSearchAdapter(_load_fixture("serpapi_ai_startups.json"))
+    candidate = search_adapter.search(_search_plan())[0]
+    page_adapter = HtmlPageContentAdapter(
+        {
+            str(candidate.url): {
+                "html": """
+                <html>
+                  <head>
+                    <title>HTML Startup AI Platform</title>
+                    <style>.hidden { display: none; }</style>
+                    <script>window.secret = 'ignore me';</script>
+                  </head>
+                  <body>
+                    <h1>AI agents for operations</h1>
+                    <p>Startup uses proprietary workflows and AI automation.</p>
+                  </body>
+                </html>
+                """,
+            }
+        }
+    )
+
+    source = page_adapter.fetch(candidate)
+
+    assert str(source.url) == "https://example.com/startup-ai-platform"
+    assert source.domain == "example.com"
+    assert source.source_type == "official_site"
+    assert source.title == "HTML Startup AI Platform"
+    assert "AI agents for operations" in source.text
+    assert "proprietary workflows" in source.text
+    assert "ignore me" not in source.text
+    assert source.collection_method == "offline_html_page"
+
+
 def test_page_content_adapter_rejects_missing_page_fixture() -> None:
     search_adapter = SerpApiSearchAdapter(_load_fixture("serpapi_ai_startups.json"))
     page_adapter = PageContentAdapter({})
@@ -54,10 +93,21 @@ def test_page_content_adapter_rejects_missing_page_fixture() -> None:
         page_adapter.fetch(candidate)
 
 
+def test_html_page_content_adapter_rejects_payload_without_html() -> None:
+    search_adapter = SerpApiSearchAdapter(_load_fixture("serpapi_ai_startups.json"))
+    candidate = search_adapter.search(_search_plan())[0]
+    page_adapter = HtmlPageContentAdapter({str(candidate.url): {"title": "No HTML"}})
+
+    with pytest.raises(ValueError, match="must include an html field"):
+        page_adapter.fetch(candidate)
+
+
 def test_search_backed_collector_composes_search_and_page_adapters() -> None:
     collector = SearchBackedCollector(
         search_provider=SerpApiSearchAdapter(_load_fixture("serpapi_ai_startups.json")),
-        page_provider=PageContentAdapter(_load_fixture("page_payloads_ai_startups.json")),
+        page_provider=PageContentAdapter(
+            _load_fixture("page_payloads_ai_startups.json")
+        ),
     )
 
     sources = collector.collect(_search_plan())
@@ -85,7 +135,9 @@ def test_search_backed_collector_keeps_successes_when_one_page_fails() -> None:
     assert errors[0].recoverable is True
 
 
-def test_scraper_node_records_collection_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_scraper_node_records_collection_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def fake_collect_sources_with_errors(state):
         return [], [
             PipelineError(
@@ -109,6 +161,7 @@ def test_scraper_node_records_collection_errors(monkeypatch: pytest.MonkeyPatch)
     assert update["collection_attempts"] == 1
     assert update["review_required"] is True
     assert update["errors"][0].source_url == "https://example.com/missing"
+
 
 def _search_plan() -> SearchPlan:
     return SearchPlan(
