@@ -7,10 +7,7 @@ export interface ApiError {
   code?: string;
 }
 
-async function request<T>(
-  endpoint: string,
-  options?: RequestInit,
-): Promise<T> {
+async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
   try {
     const res = await fetch(url, {
@@ -109,6 +106,29 @@ export interface StartupRecord {
   updated_at: string;
 }
 
+export interface SourceDocumentRecord {
+  id: string;
+  run_id: number;
+  url: string;
+  domain: string;
+  source_type: string;
+  title: string | null;
+  text: string;
+  retrieved_at: string;
+  collection_method: string;
+  claim_count: number;
+  average_claim_confidence: number | null;
+}
+
+export interface EvidenceClaimRecord {
+  id: string;
+  run_id: number;
+  source_document_id: string;
+  text: string;
+  claim_type: string;
+  confidence: number;
+}
+
 export interface SubmitRunResponse {
   run_id: number;
   status: string;
@@ -136,6 +156,18 @@ export function fetchStartups(): Promise<StartupRecord[]> {
 
 export function fetchStartupById(id: string): Promise<StartupRecord> {
   return request<StartupRecord>(`/startups/${id}`);
+}
+
+export function fetchSources(): Promise<SourceDocumentRecord[]> {
+  return request<SourceDocumentRecord[]>("/sources");
+}
+
+export function fetchRunSources(id: number): Promise<SourceDocumentRecord[]> {
+  return request<SourceDocumentRecord[]>(`/runs/${id}/sources`);
+}
+
+export function fetchRunClaims(id: number): Promise<EvidenceClaimRecord[]> {
+  return request<EvidenceClaimRecord[]>(`/runs/${id}/claims`);
 }
 
 export function submitRun(query: string): Promise<SubmitRunResponse> {

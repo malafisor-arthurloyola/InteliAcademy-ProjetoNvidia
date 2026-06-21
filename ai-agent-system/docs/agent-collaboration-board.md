@@ -89,7 +89,7 @@ scraping real controlado
 Resumo atual:
 
 ```text
-Codex concluiu Commit 2: endpoints backend reais para fontes/evidencias, rota raiz e CORS local. Validacoes: ruff ok, pip check ok, pytest 150 passed.
+Codex concluiu Commit 3: tela Sources integrada aos endpoints reais de fontes/evidencias. Validacoes: ESLint dos arquivos tocados ok, npm run build ok, pip check ok, pytest 150 passed.
 ```
 
 Ultima atualizacao:
@@ -164,20 +164,18 @@ Status: concluido por Codex.
 Objetivo atual:
 
 ```text
-Commit 2: expor fontes/evidencias reais do SQLite via API, adicionar rota raiz e CORS para frontend local.
+Commit 3: substituir mock-data da tela Sources por dados reais da FastAPI.
 ```
 ## Arquivos reservados
 
 Agente: Codex
 Arquivos:
 - ai-agent-system/docs/agent-collaboration-board.md
-- ai-agent-system/src/radar/database/repository.py
-- ai-agent-system/src/radar/database/__init__.py
-- ai-agent-system/src/radar/api/app.py
-- ai-agent-system/tests/test_database.py
-- ai-agent-system/tests/test_api_crud.py
+- frontend/src/lib/api.ts
+- frontend/src/lib/hooks/use-sources.ts
+- frontend/src/routes/sources.tsx
 Motivo:
-- Reaproveitar tabelas reais de source_documents/evidence_claims para endpoints consumidos pelo frontend e melhorar diagnostico local da API.
+- Consumir os novos endpoints reais de fontes/evidencias no frontend e remover o uso de mock-data da tela Sources.
 Inicio:
 - 2026-06-21
 Fim:
@@ -194,7 +192,7 @@ Motivo:
 Inicio:
 - YYYY-MM-DD HH:MM
 Fim:
-- pendente ou concluido
+- 2026-06-21 ou concluido
 ```
 
 ## Mensagem para Codex

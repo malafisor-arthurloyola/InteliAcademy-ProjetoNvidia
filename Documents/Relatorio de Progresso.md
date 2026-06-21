@@ -1089,3 +1089,48 @@ Fazer o Commit 3 no frontend:
 2. substituir `mock-data` na tela Sources por `GET /sources`;
 3. adaptar Briefing/Startup Detail para ler fontes/claims do run real quando existir;
 4. manter fallback visual explícito para estado vazio, sem inventar startups ou evidências.
+## 2026-06-21 (Frontend Sources com dados reais da API)
+
+### Resumo executivo
+
+Foi concluida a primeira migracao concreta do frontend para deixar de usar dados mockados: a tela `Sources` agora consome a FastAPI, usando os endpoints reais criados para fontes e evidencias persistidas no SQLite.
+
+### O que mudou
+
+- `frontend/src/lib/api.ts`
+  - adicionou `SourceDocumentRecord` e `EvidenceClaimRecord`;
+  - adicionou `fetchSources()`, `fetchRunSources(id)` e `fetchRunClaims(id)`.
+- `frontend/src/lib/hooks/use-sources.ts`
+  - criado com hooks React Query para fontes e claims.
+- `frontend/src/routes/sources.tsx`
+  - removeu importacao de `sources` de `mock-data`;
+  - passou a ler `GET /sources`;
+  - adicionou estado vazio explicito quando ainda nao ha fontes persistidas;
+  - calcula status apenas a partir de dados existentes (`claim_count` e `average_claim_confidence`), sem inventar validacao ou contradicao.
+- `frontend/src/routeTree.gen.ts`
+  - atualizado automaticamente pelo build do TanStack Router.
+
+### Validações
+
+```text
+pip check -> No broken requirements found.
+pytest -> 150 passed, 2 warnings conhecidos.
+Prettier nos arquivos tocados -> ok.
+ESLint nos arquivos tocados -> ok.
+npm run build -> ok.
+```
+
+Observacao: `npm run lint` global ainda falha por muitos debitos Prettier preexistentes em arquivos fora do escopo desta tarefa. Por isso a validacao usada para este commit foi ESLint apenas nos arquivos tocados.
+
+### Importante sobre dados reais
+
+A tela agora consome dados reais da API e do SQLite local. Enquanto os providers estiverem em modo fixture/fail-closed, os dados persistidos ainda serao determinísticos de teste. O avanco desta etapa e arquitetural: o frontend nao inventa mais a tabela Sources; ele mostra o que o pipeline gravou.
+
+### Proximo passo sugerido
+
+Migrar as proximas telas que ainda dependem de mocks:
+
+1. Ranking/Overview: consumir `GET /startups` e `GET /runs` com estados vazios honestos.
+2. Startup Detail: mapear `StartupRecord` real e associar fontes/claims quando houver run relacionado.
+3. Briefing: buscar recomendacoes reais de `GET /runs/{id}` em vez de briefing demo.
+4. Contacts/Profile: manter como backlog ou marcar explicitamente como dados nao implementados.
