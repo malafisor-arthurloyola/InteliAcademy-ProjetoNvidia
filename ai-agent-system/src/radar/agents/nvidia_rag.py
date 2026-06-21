@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+from typing import Any, cast, get_args
+
 from radar.graph.state import RadarState
 from radar.rag.retriever import ensure_seeded, retrieve
 from radar.schemas import NvidiaKnowledgeChunk
+from radar.schemas.recommendation import NvidiaTechnology
+
+
+NVIDIA_TECHNOLOGIES: set[str] = set(get_args(NvidiaTechnology))
 
 
 def retrieve_nvidia_context(state: RadarState) -> list[NvidiaKnowledgeChunk]:
@@ -32,7 +38,7 @@ def retrieve_nvidia_context(state: RadarState) -> list[NvidiaKnowledgeChunk]:
     supported_claims = [
         claim
         for claim in state.get("claims", [])
-        if claim.id in (validation.supporting_evidence_ids if validation else [])
+        if claim.id in validation.supporting_evidence_ids
     ]
     if supported_claims:
         claim_text = " ".join(c.text for c in supported_claims)
@@ -46,20 +52,40 @@ def retrieve_nvidia_context(state: RadarState) -> list[NvidiaKnowledgeChunk]:
     results = retrieve(query, top_k=5)
 
     chunks: list[NvidiaKnowledgeChunk] = []
-    for r in results:
-        score = r.get("score", 0.0)
+    for result in results:
+        score = _as_score(result.get("score"))
         if score < 0.3:
             continue
-        chunk_id = str(r.get("id", "")) if r.get("id") is not None else None
+
+        technology = _as_nvidia_technology(result.get("technology"))
+        if technology is None:
+            continue
+
         chunks.append(
-                NvidiaKnowledgeChunk(
-                    id=chunk_id,
-                    technology=r.get("technology", ""),
-                    title=r.get("title", ""),
-                    url=r.get("url", ""),
-                    content=r.get("content", ""),
-                    relevance_score=score,
-                )
+            NvidiaKnowledgeChunk(
+                id=str(result.get("id", "")),
+                technology=technology,
+                title=_as_text(result.get("title")),
+                url=_as_text(result.get("url")),
+                content=_as_text(result.get("content")),
+                relevance_score=score,
             )
+        )
 
     return chunks
+
+
+def _as_score(value: Any) -> float:
+    if isinstance(value, int | float):
+        return max(0.0, min(float(value), 1.0))
+    return 0.0
+
+
+def _as_text(value: Any) -> str:
+    return value if isinstance(value, str) else ""
+
+
+def _as_nvidia_technology(value: Any) -> NvidiaTechnology | None:
+    if isinstance(value, str) and value in NVIDIA_TECHNOLOGIES:
+        return cast(NvidiaTechnology, value)
+    return None

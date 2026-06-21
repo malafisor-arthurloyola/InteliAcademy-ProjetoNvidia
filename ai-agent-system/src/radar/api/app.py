@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import asdict
-from typing import Any, AsyncGenerator
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from radar.database import (
@@ -41,14 +43,24 @@ class RunRequest(BaseModel):
 
 def _persist_run_result(run_id: int, result: dict[str, Any]) -> None:  # noqa: C901
     classification_data = result.get("classification")
-    startup_data = result.get("extracted_startups", [None])[0] if result.get("extracted_startups") else None
+    startup_data = (
+        result.get("extracted_startups", [None])[0]
+        if result.get("extracted_startups")
+        else None
+    )
 
     if startup_data:
         startup_dict: dict[str, Any] = {
             **startup_data.model_dump(),
-            "classification_label": classification_data.label if classification_data else None,
-            "classification_confidence": classification_data.confidence if classification_data else None,
-            "classification_rationale": classification_data.rationale if classification_data else None,
+            "classification_label": classification_data.label
+            if classification_data
+            else None,
+            "classification_confidence": classification_data.confidence
+            if classification_data
+            else None,
+            "classification_rationale": classification_data.rationale
+            if classification_data
+            else None,
         }
         save_startup(startup_dict)
         update_run_status(run_id, "completed")
@@ -80,16 +92,20 @@ def provider_preflight() -> dict[str, object]:
 
 
 @app.post("/runs")
-def run_analysis(payload: RunRequest) -> dict[str, object]:
+def run_analysis(payload: RunRequest) -> dict[str, Any]:
     if not payload.query.strip():
         raise HTTPException(status_code=400, detail="query must not be empty")
 
     run_id = save_run(payload.query)
     try:
         graph = build_graph()
-        result = graph.invoke({"query": payload.query, "collection_attempts": 0})
+        result: dict[str, Any] = graph.invoke(
+            {"query": payload.query, "collection_attempts": 0}
+        )
         _persist_run_result(run_id, result)
-        return {"run_id": run_id, "status": "completed", "result": result}
+        return jsonable_encoder(
+            {"run_id": run_id, "status": "completed", "result": result}
+        )
     except Exception as exc:
         update_run_status(run_id, "failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
