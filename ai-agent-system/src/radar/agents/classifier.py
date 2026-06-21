@@ -1,30 +1,185 @@
 from __future__ import annotations
 
-from radar.schemas import StartupClassification
 from radar.graph.state import RadarState
+from radar.schemas import StartupClassification
+
+AI_NATIVE_KEYWORDS = (
+    "proprietário", "proprietario", "proprietary",
+    "dados proprietários", "dados proprietarios",
+    "fine.tuning", "modelo próprio", "modelo proprietario",
+    "custom model", "custom llm",
+    "deep integration", "deep learning",
+    "autonomous", "autônomo", "autonomo",
+    "computer vision", "vision",
+    "predictive", "preditivo",
+    "multi.agent", "multiagent",
+    "orquestração", "orchestration",
+    "agente", "agent",
+)
+
+AI_ENABLED_KEYWORDS = (
+    "api", "llm", "openai", "gpt", "chatgpt",
+    "automation", "automacão", "automacao",
+    "workflow", "pipeline",
+    "assistant", "assistente",
+    "chatbot", "chat.bot",
+    "summarization", "sumarização", "sumarizacao",
+    "transcription", "transcrição", "transcricao",
+    "recommendation", "recommendaçao", "recomendacao",
+)
+
+NVIDIA_TECHS = {
+    "TensorRT-LLM", "Triton Inference Server", "NeMo", "RAPIDS",
+    "CUDA", "Omniverse", "Isaac", "Clara", "Morpheus", "Riva",
+    "NVIDIA Inception", "AI Enterprise",
+}
 
 
 def classify_startup(state: RadarState) -> StartupClassification:
     claims = state.get("claims", [])
-    ai_claims = [
-        claim
-        for claim in claims
-        if any(marker in claim.text.lower() for marker in ("ai", "ia", "llm", "machine learning"))
-    ]
+    sources = state.get("sources", [])
+    profiles = state.get("extracted_startups", [])
 
-    if ai_claims:
+    all_text = " ".join(s.text for s in sources if s.text) if sources else ""
+    ai_claims = [c for c in claims if c.claim_type == "ai_usage"]
+    tech_claims = [c for c in claims if c.claim_type == "technology_signal"]
+
+    profile = profiles[0] if profiles else None
+    cited_technologies = profile.cited_technologies if profile else []
+    sector = profile.sector if profile else None
+    has_funding = bool(profile.funding if profile else None)
+    has_founders = bool(profile.founders if profile else None)
+
+    ai_native_score = _score_ai_native(all_text, cited_technologies)
+    ai_enabled_score = _score_ai_enabled(all_text, cited_technologies)
+    evidence_score = _evidence_quality_score(ai_claims, tech_claims, sources)
+    business_score = _business_maturity_score(has_funding, has_founders, sector)
+
+    combined = ai_native_score + ai_enabled_score + evidence_score + business_score
+    has_nvidia_techs = bool(cited_technologies and any(t in NVIDIA_TECHS for t in cited_technologies))
+
+    if ai_native_score >= 2 and combined >= 3.5:
+        return StartupClassification(
+            label="AI-Native",
+            confidence=min(combined / 6.0, 0.95),
+            rationale=(
+                f"Strong AI-native signals detected: {_list_signals(all_text, AI_NATIVE_KEYWORDS)}. "
+                f"Tecnologias citadas: {cited_technologies or 'nenhuma'}. "
+                f"Setor: {sector or 'nao identificado'}. "
+                f"Funding: {'sim' if has_funding else 'nao'}. "
+                f"Founders: {'sim' if has_founders else 'nao'}."
+            ),
+            supporting_evidence_ids=[c.id for c in ai_claims],
+            caveats=_build_caveats(cited_technologies),
+        )
+
+    if combined >= 1.5 or (ai_claims and has_nvidia_techs) or (ai_claims and len(ai_claims) >= 2 and combined >= 1.0):
         return StartupClassification(
             label="AI-Enabled",
-            confidence=0.55,
-            rationale="Public evidence mentions AI usage, but the MVP classifier cannot yet verify deep AI-native dependency.",
-            supporting_evidence_ids=[claim.id for claim in ai_claims],
-            caveats=["Replace this deterministic placeholder with a structured classifier before production use."],
+            confidence=min(max(combined / 4.0, 0.5), 0.85),
+            rationale=(
+                f"Public evidence suggests AI usage. "
+                f"Sinais AI-Enabled: {_list_signals(all_text, AI_ENABLED_KEYWORDS)}. "
+                f"Tecnologias citadas: {cited_technologies or 'nenhuma'}. "
+                f"Setor: {sector or 'nao identificado'}."
+            ),
+            supporting_evidence_ids=[c.id for c in ai_claims],
+            caveats=_build_caveats(cited_technologies),
         )
 
     return StartupClassification(
         label="Non-AI",
         confidence=0.4,
-        rationale="No explicit public AI evidence was extracted by the MVP pipeline.",
+        rationale=(
+            "Nenhuma evidencia suficiente de uso de IA foi encontrada nas fontes coletadas."
+        ),
         supporting_evidence_ids=[],
-        caveats=["Absence of extracted evidence is not proof that the startup does not use AI."],
+        caveats=["Ausencia de evidencia nao prova que a startup nao usa IA."],
     )
+
+
+def _score_ai_native(text: str, technologies: list[str]) -> float:
+    score = 0.0
+    for keyword in AI_NATIVE_KEYWORDS:
+        tokens = keyword.split()
+        if len(tokens) == 1:
+            if tokens[0] in text.lower():
+                score += 0.3
+        else:
+            if keyword.replace(".", "") in text.lower():
+                score += 0.4
+
+    has_nvidia_techs = sum(1 for t in technologies if t in NVIDIA_TECHS)
+    score += has_nvidia_techs * 0.5
+
+    if "agent" in text.lower() and "multi" in text.lower():
+        score += 0.5
+    if "fine.uning" in text.lower() or "custom model" in text.lower():
+        score += 0.5
+    if "proprietary" in text.lower() or "proprietário" in text.lower():
+        score += 0.4
+
+    return min(score, 4.0)
+
+
+def _score_ai_enabled(text: str, technologies: list[str]) -> float:
+    score = 0.0
+    for keyword in AI_ENABLED_KEYWORDS:
+        tokens = keyword.split()
+        if len(tokens) == 1:
+            if tokens[0] in text.lower():
+                score += 0.2
+        else:
+            if keyword.replace(".", "") in text.lower():
+                score += 0.25
+
+    has_generic_techs = sum(1 for t in technologies if t not in NVIDIA_TECHS)
+    score += has_generic_techs * 0.2
+
+    return min(score, 3.0)
+
+
+def _evidence_quality_score(
+    ai_claims: list, tech_claims: list, sources: list
+) -> float:
+    score = 0.0
+    score += min(len(ai_claims) * 0.3, 1.5)
+    score += min(len(tech_claims) * 0.2, 0.6)
+
+    unique_types = {s.source_type for s in sources}
+    score += min(len(unique_types) * 0.15, 0.6)
+
+    return min(score, 2.0)
+
+
+def _business_maturity_score(
+    has_funding: bool, has_founders: bool, sector: str | None
+) -> float:
+    score = 0.0
+    if has_funding:
+        score += 0.4
+    if has_founders:
+        score += 0.3
+    if sector:
+        score += 0.2
+    return min(score, 1.0)
+
+
+def _list_signals(text: str, keywords: tuple[str, ...]) -> str:
+    found = []
+    for keyword in keywords[:5]:
+        if keyword.replace(".", "") in text.lower():
+            found.append(keyword.replace(".", ""))
+    return ", ".join(found) if found else "nenhum sinal claro"
+
+
+def _build_caveats(technologies: list[str]) -> list[str]:
+    caveats = [
+        "Classificador deterministico placeholder; substituir por LLM antes de producao."
+    ]
+    has_nvidia = any(t in NVIDIA_TECHS for t in technologies)
+    if has_nvidia:
+        caveats.append(
+            "Startup ja cita tecnologias NVIDIA: validar se ja esta no NVIDIA Inception."
+        )
+    return caveats
