@@ -89,7 +89,7 @@ scraping real controlado
 Resumo atual:
 
 ```text
-Codex concluiu Commit 3: tela Sources integrada aos endpoints reais de fontes/evidencias. Validacoes: ESLint dos arquivos tocados ok, npm run build ok, pip check ok, pytest 150 passed.
+Codex concluiu UX fix: logos de empresas em Ranking e Contacts agora navegam para /startup/{id}. Validacoes: ESLint dos arquivos tocados ok, npm run build ok, pip check ok, pytest 150 passed.
 ```
 
 Ultima atualizacao:
@@ -164,18 +164,17 @@ Status: concluido por Codex.
 Objetivo atual:
 
 ```text
-Commit 3: substituir mock-data da tela Sources por dados reais da FastAPI.
+UX fix: logos clicaveis em Ranking/Contacts; proximo bloco sera preflight real autorizado.
 ```
 ## Arquivos reservados
 
 Agente: Codex
 Arquivos:
 - ai-agent-system/docs/agent-collaboration-board.md
-- frontend/src/lib/api.ts
-- frontend/src/lib/hooks/use-sources.ts
-- frontend/src/routes/sources.tsx
+- frontend/src/routes/ranking.tsx
+- frontend/src/routes/contacts.tsx
 Motivo:
-- Consumir os novos endpoints reais de fontes/evidencias no frontend e remover o uso de mock-data da tela Sources.
+- Tornar o clique no ícone/logo das empresas consistente com a navegação para /startup/{id} fora do dashboard.
 Inicio:
 - 2026-06-21
 Fim:
