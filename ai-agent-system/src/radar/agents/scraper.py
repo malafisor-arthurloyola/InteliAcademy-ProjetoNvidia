@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from radar.graph.state import RadarState
-from radar.scraping.collectors import StaticSeedCollector, WebCollector
 from radar.schemas import PipelineError, SourceDocument
+from radar.scraping.collectors import WebCollector
+from radar.scraping.provider_factory import build_web_collector
 
 
 def collect_sources(state: RadarState) -> list[SourceDocument]:
     plan = state["search_plan"]
-    collector = StaticSeedCollector()
+    collector = build_web_collector()
     return collector.collect(plan)
 
 
@@ -16,7 +17,7 @@ def collect_sources_with_errors(
     collector: WebCollector | None = None,
 ) -> tuple[list[SourceDocument], list[PipelineError]]:
     plan = state["search_plan"]
-    active_collector = collector or StaticSeedCollector()
+    active_collector = collector or build_web_collector()
     detailed_collect = getattr(active_collector, "collect_with_errors", None)
     if callable(detailed_collect):
         return detailed_collect(plan)
