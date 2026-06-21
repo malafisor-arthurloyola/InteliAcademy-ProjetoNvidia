@@ -843,16 +843,33 @@ Site Lovable baixado pelo usuário e movido para `frontend/` (renomeado de `fron
 
 Arquivo `TophIcon.png` adicionado à raiz do projeto (1.3 MB). Será usado como favicon e ícone do app frontend.
 
-#### Plano de integração API real
+#### Integração API + Loading States (implementado)
 
-Plano detalhado aprovado pelo usuário:
+Nesta etapa, o frontend foi conectado à API real com loading states, pipeline animado ("AI pensando") e exibição de erros honestos.
 
-1. **api.ts** — cliente HTTP tipado com `fetch` nativo para os 7 endpoints do backend
-2. **Hooks React Query** — `useStartups()`, `useRuns()`, `useRun(id)`, `useSubmitRun()`, `useHealth()`
-3. **ApiErrorDisplay** — componente que mostra erro EXATO (endpoint, status code, mensagem) quando API não está rodando
-4. **PipelineStatus** — pipeline visual animado com 8 steps, pulse, polling a cada 2s, badge "IA processando..."
-5. **Adaptação página a página** — Pipeline primeiro (maior impacto), depois Overview + Ranking + Startup Detail, depois Briefing + Sources + Contacts
-6. **Fallback progressivo** — em vez de mock, mostra erro explícito com código
+**Arquivos criados:**
+
+| Arquivo | Descrição |
+|---|---|
+| `frontend/src/lib/api.ts` | Cliente HTTP tipado (`fetch` nativo) para 7 endpoints. Cada função retorna `Promise<T>` ou lança `ApiError` com `{ endpoint, status, message, code }` |
+| `frontend/src/lib/hooks/use-health.ts` | `useHealth()` — query React Query para `GET /health`, retry: 1 |
+| `frontend/src/lib/hooks/use-runs.ts` | `useRuns()`, `useRun(id)` (com `refetchInterval: 2000` se status pending/running), `useSubmitRun()` (mutation + invalida cache) |
+| `frontend/src/lib/hooks/use-startups.ts` | `useStartups()`, `useStartup(id)` — queries para listar/detalhar startups |
+| `frontend/src/components/api-error-display.tsx` | Card que mostra endpoint, status code, mensagem, código do erro, dica de ação + botão "Tentar novamente" |
+| `frontend/src/components/pipeline-status.tsx` | Pipeline visual com 8 steps (Search Planner → Briefing), cada step com ícone + status (idle/running/done/error), pulse animation, timer, Progress bar (Radix), badge "IA processando..." com animate-pulse |
+
+**Arquivos modificados:**
+
+| Arquivo | Mudança |
+|---|---|
+| `frontend/src/routes/pipeline.tsx` | **Transformação completa**: input + "Executar Pipeline" → `useSubmitRun()` → `useRun(id)` com polling 2s → PipelineStatus animado → resultados (recomendações). Regras do pipeline mantidas. |
+| `frontend/src/routes/index.tsx` | `useHealth()` check: se API off → ApiErrorDisplay; se API on → badge "API ativa" (verde) |
+| `frontend/src/routes/ranking.tsx` | `useHealth()` + skeleton loading + error display |
+| `frontend/src/routes/startup.$id.tsx` | `useHealth()` + skeleton loading + error display |
+| `frontend/src/routes/briefing.tsx` | `useHealth()` + skeleton loading + error display + badge "API ativa" |
+| `frontend/src/routes/sources.tsx` | `useHealth()` + skeleton loading + error display |
+| `frontend/src/routes/contacts.tsx` | `useHealth()` + skeleton loading + error display |
+| `frontend/src/routes/__root.tsx` | Favicon `TophIcon.png` linkado como `<link rel="icon">` |
 
 #### Decisões de design (frontend-design skill)
 
@@ -860,32 +877,41 @@ Plano detalhado aprovado pelo usuário:
 - Dark theme denso, dados à mostra
 - Acento NVIDIA verde (#76B900) + alertas laranja/vermelho
 - Sem gradients roxos, glassmorphism ou blobs decorativos (anti-AI-slop)
-- Loading states com propósito: skeleton pulse, pipeline steps animados
-- Erro honesto: código HTTP + endpoint + mensagem, sem esconder
+- Loading states com propósito: skeleton pulse, pipeline steps animados, spinner no botão
+- Erro honesto: código HTTP + endpoint + mensagem, sem esconder — ex:
+  ```
+  GET /health — Erro 0 (ECONNREFUSED). Backend FastAPI não está rodando.
+  ```
+- Quando API está online: badge verde "API ativa" no lugar de "Demo data"
 
 #### Handoff atualizado
 
-Handoff consolidado no final deste relatório (não mais em arquivo separado).
+Handoff consolidado neste relatório (não mais em arquivo separado).
+
+Commits:
+
+```text
+5edf649 feat: RAG enricher (trafilatura), SQLite + FastAPI CRUD, frontend base, Toph icon
+07e68e0 feat(frontend): API client, hooks, loading states, pipeline animation, Toph icon
+```
 
 ### Testes
 
-Nenhum teste novo nesta sessão (foco em planejamento frontend).
+Nenhum teste novo nesta sessão (foco em frontend).
 
 Total: 145 tests passing (inalterado)
 
 ### Skills
 
-Skill `frontend-design` consultada para guiar decisões estéticas e de UX.
+Skill `frontend-design` consultada para guiar decisões estéticas e de UX. Skill `obsidian-learning-notes` para documentação.
 
 ### Próximos passos
 
 ```text
-1. Commit + push do estado atual (gitignore, relatório, frontend base, TophIcon)
-2. Criar api.ts + hooks (useRuns, useStartups, useHealth)
-3. Criar ApiErrorDisplay + PipelineStatus components
-4. Adaptar Pipeline page (loading AI animado + polling)
-5. Adaptar Overview + Ranking + Startup Detail
-6. Adaptar Briefing + Sources + Contacts
-7. Frontend integrado com API real rodando
+1. Rodar frontend (npm run dev) + backend (uvicorn) juntos e testar
+2. Pipeline page já funcional com POST /runs → polling → resultados
+3. Overview/Ranking/etc usam mock data com health check (próximo passo: usar dados reais da API)
+4. Fase 4b: refinar frontend com dados reais quando backend tiver computed scores
+5. Considerar adicionar Subscription ao backend (WebSocket) para pipeline em tempo real
 ```
 ```
