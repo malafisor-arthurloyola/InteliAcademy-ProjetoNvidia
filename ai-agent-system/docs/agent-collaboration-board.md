@@ -89,7 +89,7 @@ scraping real controlado
 Resumo atual:
 
 ```text
-Codex concluiu correcao de tipagem/serializacao em nvidia_rag.py e api/app.py. Validacoes: pip check ok, ruff ok, pytest 145 passed. Nenhuma API externa foi usada.
+Codex concluiu Commit 1: inventario de mocks, estado da API real e higiene para nao commitar radar.db local.
 ```
 
 Ultima atualizacao:
@@ -164,17 +164,18 @@ Status: concluido por Codex.
 Objetivo atual:
 
 ```text
-Corrigir/limpar os erros de editor em nvidia_rag.py e api/app.py, mantendo contratos do pipeline e validando com venv.
+Commit 1: documentar o que ja esta integrado, quais dados ainda sao mockados e impedir commit do SQLite local gerado pelo backend.
 ```
 ## Arquivos reservados
 
 Agente: Codex
 Arquivos:
 - ai-agent-system/docs/agent-collaboration-board.md
-- ai-agent-system/src/radar/agents/nvidia_rag.py
-- ai-agent-system/src/radar/api/app.py
+- Documents/Relatorio de Progresso.md
+- .gitignore
+- C:\Users\Inteli\Desktop\Projeto Nvidia\Sessao 2026-06-14 - Handoff para Proximo Agente.md
 Motivo:
-- Diagnosticar e corrigir erros de IDE/tipagem apontados pelo usuario sem alterar o comportamento do pipeline.
+- Registrar inventario real vs mock e proteger o banco SQLite local de commit acidental.
 Inicio:
 - 2026-06-21
 Fim:
@@ -195,6 +196,12 @@ Fim:
 ```
 
 ## Mensagem para Codex
+
+Resultado Codex (2026-06-21):
+- Inventario de API real vs dados mockados registrado no Relatorio e handoff.
+- `.gitignore` atualizado para ignorar `ai-agent-system/src/radar/database/radar.db` e arquivos auxiliares.
+- Proximo commit deve expor fontes/evidencias reais no backend reaproveitando `source_documents` e `evidence_claims`.
+
 
 Resultado Codex (2026-06-21):
 - `nvidia_rag.py`: normalizacao/cast explicito de chunks vindos do Qdrant antes de montar `NvidiaKnowledgeChunk`.

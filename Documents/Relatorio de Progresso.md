@@ -954,3 +954,83 @@ f7ccd64 fix: normalize rag and api response typing
 2. Testar `POST /runs` pela tela Pipeline e confirmar se o frontend recebe o resultado serializado sem erros.
 3. Trocar mocks remanescentes de Overview/Ranking/Detail por dados reais da API.
 4. Depois, avaliar WebSocket ou Server-Sent Events para status em tempo real do pipeline.
+## 2026-06-21 (Inventario real vs mock e higiene SQLite)
+
+### Resumo executivo
+
+Foi iniciado o plano de remover dados mockados do frontend. Antes de migrar telas, foi documentado o estado real: quais endpoints do backend ja funcionam, quais telas usam API real e quais arquivos ainda dependem de dados ficticios.
+
+### Backend real disponivel
+
+Rotas FastAPI ja existentes:
+
+```text
+GET  /health
+GET  /providers/preflight
+POST /runs
+GET  /runs
+GET  /runs/{id}
+GET  /startups
+GET  /startups/{id}
+```
+
+Observacao: abrir `http://127.0.0.1:8000/` no navegador retorna 404 porque ainda nao existe rota raiz. Isso nao significa que o backend falhou; a rota correta para teste rapido e `/health`.
+
+### Fluxos frontend ja integrados com API real
+
+- `frontend/src/routes/pipeline.tsx`
+  - usa `POST /runs` para executar o pipeline;
+  - usa `GET /runs/{id}` para consultar resultado/recomendacoes.
+- Varias paginas usam `GET /health` para verificar se a API esta ativa.
+- `frontend/src/lib/api.ts` ja possui cliente para:
+  - `GET /health`
+  - `GET /providers/preflight`
+  - `GET /runs`
+  - `GET /runs/{id}`
+  - `GET /startups`
+  - `GET /startups/{id}`
+  - `POST /runs`
+
+### Dados ainda mockados
+
+Arquivos que ainda importam `mock-data` ou `company-extras`:
+
+```text
+frontend/src/components/topbar.tsx
+frontend/src/components/ui-bits.tsx
+frontend/src/routes/index.tsx
+frontend/src/routes/ranking.tsx
+frontend/src/routes/startup.$id.tsx
+frontend/src/routes/briefing.tsx
+frontend/src/routes/sources.tsx
+frontend/src/routes/contacts.tsx
+frontend/src/routes/profile.tsx
+frontend/src/lib/company-extras.ts
+frontend/src/lib/mock-data.ts
+```
+
+Tipos de dados mockados que devem sair antes do produto final:
+
+- startups ficticias;
+- fontes/evidencias ficticias;
+- scores de radar, evidencia, crescimento, NVIDIA fit e prioridade de contato;
+- funil comercial;
+- distribuicoes por setor/regiao/semana;
+- contatos comerciais;
+- valuation/funding quando nao vierem de evidencia real;
+- briefings demo.
+
+### Higiene de repositorio
+
+O backend SQLite cria `ai-agent-system/src/radar/database/radar.db` localmente. Esse arquivo e estado runtime local e nao deve ser commitado.
+
+Adicionado ao `.gitignore`:
+
+```text
+ai-agent-system/src/radar/database/radar.db
+ai-agent-system/src/radar/database/radar.db-*
+```
+
+### Proximo passo
+
+Implementar suporte backend para fontes/evidencias reais reaproveitando as tabelas ja existentes (`source_documents`, `evidence_claims`, `validations`) e expor endpoints para o frontend substituir `mock-data` na tela Sources.
