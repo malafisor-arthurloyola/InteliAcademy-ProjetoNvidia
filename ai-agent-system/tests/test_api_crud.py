@@ -15,6 +15,7 @@ def _clean_db() -> None:
     if db_path.exists():
         db_path.unlink()
     from radar.database import init_db
+
     init_db()
     yield
     if db_path.exists():
@@ -26,6 +27,28 @@ def test_health_endpoint() -> None:
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_root_endpoint_points_to_docs_and_health() -> None:
+    client = TestClient(app)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["health"] == "/health"
+    assert response.json()["docs"] == "/docs"
+
+
+def test_local_frontend_cors_preflight() -> None:
+    client = TestClient(app)
+    response = client.options(
+        "/health",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
 
 
 def test_provider_preflight_endpoint() -> None:
@@ -47,6 +70,13 @@ def test_list_runs_empty() -> None:
 def test_list_startups_empty() -> None:
     client = TestClient(app)
     response = client.get("/startups")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_list_sources_empty() -> None:
+    client = TestClient(app)
+    response = client.get("/sources")
     assert response.status_code == 200
     assert response.json() == []
 
@@ -88,3 +118,20 @@ def test_run_analysis_can_be_queried_afterwards() -> None:
     assert get_resp.status_code == 200
     assert get_resp.json()["query"] == "startup brasileira de IA"
     assert get_resp.json()["status"] == "completed"
+
+
+def test_run_analysis_exposes_sources_and_claims_afterwards() -> None:
+    client = TestClient(app)
+    post_resp = client.post("/runs", json={"query": "startup brasileira de IA"})
+    run_id = post_resp.json()["run_id"]
+
+    sources_resp = client.get(f"/runs/{run_id}/sources")
+    claims_resp = client.get(f"/runs/{run_id}/claims")
+    all_sources_resp = client.get("/sources")
+
+    assert sources_resp.status_code == 200
+    assert claims_resp.status_code == 200
+    assert all_sources_resp.status_code == 200
+    assert len(sources_resp.json()) >= 1
+    assert len(claims_resp.json()) >= 1
+    assert sources_resp.json()[0]["claim_count"] >= 1

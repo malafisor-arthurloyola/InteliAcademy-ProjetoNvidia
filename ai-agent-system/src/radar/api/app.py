@@ -7,13 +7,17 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from radar.database import (
     get_all_runs,
+    get_all_source_documents,
     get_all_startups,
     get_run_by_id,
+    get_run_evidence_claims,
     get_run_recommendations,
+    get_run_source_documents,
     get_startup_by_id,
     init_db,
     save_evidence_claim,
@@ -35,6 +39,13 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(title="NVIDIA Startup AI Radar", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class RunRequest(BaseModel):
@@ -81,6 +92,16 @@ def _persist_run_result(run_id: int, result: dict[str, Any]) -> None:  # noqa: C
         update_run_status(run_id, "failed")
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {
+        "service": "NVIDIA Startup AI Radar",
+        "status": "ok",
+        "health": "/health",
+        "docs": "/docs",
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -114,6 +135,25 @@ def run_analysis(payload: RunRequest) -> dict[str, Any]:
 @app.get("/runs")
 def list_runs() -> list[dict[str, Any]]:
     return get_all_runs()
+
+
+@app.get("/sources")
+def list_sources() -> list[dict[str, Any]]:
+    return get_all_source_documents()
+
+
+@app.get("/runs/{run_id}/sources")
+def get_run_sources(run_id: int) -> list[dict[str, Any]]:
+    if not get_run_by_id(run_id):
+        raise HTTPException(status_code=404, detail="Run not found")
+    return get_run_source_documents(run_id)
+
+
+@app.get("/runs/{run_id}/claims")
+def get_run_claims(run_id: int) -> list[dict[str, Any]]:
+    if not get_run_by_id(run_id):
+        raise HTTPException(status_code=404, detail="Run not found")
+    return get_run_evidence_claims(run_id)
 
 
 @app.get("/runs/{run_id}")

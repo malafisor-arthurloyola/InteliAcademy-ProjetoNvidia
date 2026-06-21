@@ -1034,3 +1034,58 @@ ai-agent-system/src/radar/database/radar.db-*
 ### Proximo passo
 
 Implementar suporte backend para fontes/evidencias reais reaproveitando as tabelas ja existentes (`source_documents`, `evidence_claims`, `validations`) e expor endpoints para o frontend substituir `mock-data` na tela Sources.
+
+## 2026-06-21 (Endpoints reais de fontes e evidencias)
+
+### Resumo executivo
+
+Foi implementada a segunda etapa do plano de reduzir dados mockados no frontend: o backend agora expõe, via FastAPI, as fontes e evidências que o pipeline já persiste no SQLite. Nenhuma API externa foi chamada; os dados continuam vindo do pipeline local e dos providers configurados em modo fixture/fail-closed.
+
+### O que mudou
+
+- `GET /` agora retorna um status simples e links para `/health` e `/docs`, evitando a confusão do 404 ao abrir a raiz da API no navegador.
+- CORS foi habilitado para o frontend local Vite:
+  - `http://localhost:5173`
+  - `http://127.0.0.1:5173`
+- Novas consultas no repository:
+  - `get_all_source_documents()`
+  - `get_run_source_documents(run_id)`
+  - `get_run_evidence_claims(run_id)`
+- Novas rotas API:
+  - `GET /sources`
+  - `GET /runs/{run_id}/sources`
+  - `GET /runs/{run_id}/claims`
+
+### Por que isso importa
+
+Antes, a tela de Sources precisava se apoiar em dados fictícios do frontend. Agora ela pode consultar dados persistidos pelo backend, preservando o caminho correto do projeto:
+
+```text
+pipeline LangGraph
+ -> source_documents / evidence_claims no SQLite
+ -> FastAPI
+ -> frontend
+```
+
+Isso ainda não significa dados externos reais em produção. Significa que o frontend passa a consumir a arquitetura real do backend, e os mocks ficam apenas como fixtures/fallbacks de teste.
+
+### Validações
+
+```text
+ruff check src/radar tests -> All checks passed.
+pip check -> No broken requirements found.
+pytest -> 150 passed, 2 warnings conhecidos.
+```
+
+Warnings conhecidos:
+- `StarletteDeprecationWarning` do `TestClient`.
+- `FutureWarning` do pacote `google.generativeai`.
+
+### Próximo passo sugerido
+
+Fazer o Commit 3 no frontend:
+
+1. adicionar métodos no `frontend/src/lib/api.ts` para as novas rotas;
+2. substituir `mock-data` na tela Sources por `GET /sources`;
+3. adaptar Briefing/Startup Detail para ler fontes/claims do run real quando existir;
+4. manter fallback visual explícito para estado vazio, sem inventar startups ou evidências.

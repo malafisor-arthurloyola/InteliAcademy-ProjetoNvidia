@@ -89,7 +89,7 @@ scraping real controlado
 Resumo atual:
 
 ```text
-Codex concluiu Commit 1: inventario de mocks, estado da API real e higiene para nao commitar radar.db local.
+Codex concluiu Commit 2: endpoints backend reais para fontes/evidencias, rota raiz e CORS local. Validacoes: ruff ok, pip check ok, pytest 150 passed.
 ```
 
 Ultima atualizacao:
@@ -164,18 +164,20 @@ Status: concluido por Codex.
 Objetivo atual:
 
 ```text
-Commit 1: documentar o que ja esta integrado, quais dados ainda sao mockados e impedir commit do SQLite local gerado pelo backend.
+Commit 2: expor fontes/evidencias reais do SQLite via API, adicionar rota raiz e CORS para frontend local.
 ```
 ## Arquivos reservados
 
 Agente: Codex
 Arquivos:
 - ai-agent-system/docs/agent-collaboration-board.md
-- Documents/Relatorio de Progresso.md
-- .gitignore
-- C:\Users\Inteli\Desktop\Projeto Nvidia\Sessao 2026-06-14 - Handoff para Proximo Agente.md
+- ai-agent-system/src/radar/database/repository.py
+- ai-agent-system/src/radar/database/__init__.py
+- ai-agent-system/src/radar/api/app.py
+- ai-agent-system/tests/test_database.py
+- ai-agent-system/tests/test_api_crud.py
 Motivo:
-- Registrar inventario real vs mock e proteger o banco SQLite local de commit acidental.
+- Reaproveitar tabelas reais de source_documents/evidence_claims para endpoints consumidos pelo frontend e melhorar diagnostico local da API.
 Inicio:
 - 2026-06-21
 Fim:
