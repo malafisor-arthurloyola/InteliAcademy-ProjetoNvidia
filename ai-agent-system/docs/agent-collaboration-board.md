@@ -15,7 +15,7 @@ Ele nao substitui o handoff unico do Obsidian. Use este arquivo como canal de tr
    - `ai-agent-system/skills/SKILLS_INDEX.md`
    - Leia a SKILL.md da skill relevante antes de codificar.
 3. Leia este quadro inteiro.
-3. Atualize apenas a sua area ou a area explicitamente combinada.
+4. Atualize apenas a sua area ou a area explicitamente combinada.
 4. Declare quais arquivos pretende tocar antes de editar codigo.
 5. Nao use APIs externas sem autorizacao explicita do usuario.
 6. Use sempre o Python do venv do projeto.
@@ -89,13 +89,13 @@ scraping real controlado
 Resumo atual:
 
 ```text
-Codex concluiu o preflight offline de providers de scraping. Validacoes: pip check ok, pytest 43 passed, ruff ok. Aguardando revisao do Opencode se desejado.
+Codex concluiu a exposicao do preflight offline via FastAPI. Validacoes: pip check ok, pytest 44 passed, ruff ok. Nenhuma API externa foi usada.
 ```
 
 Ultima atualizacao:
 
 ```text
-2026-06-20 21:36
+2026-06-20 21:49
 ```
 Proxima verificacao sugerida:
 
@@ -164,22 +164,21 @@ Status: concluido por Codex.
 Objetivo atual:
 
 ```text
-Criar preflight offline de providers de scraping para diagnosticar fixture/fixture e serpapi/firecrawl sem chamar rede ou APIs externas.
+Expor o diagnostico offline de providers em uma rota FastAPI para facilitar verificacao local antes de qualquer scraping real.
 ```
 ## Arquivos reservados
 
 Agente: Codex
 Arquivos:
 - ai-agent-system/docs/agent-collaboration-board.md
-- ai-agent-system/src/radar/scraping/provider_preflight.py
-- ai-agent-system/tests/test_provider_preflight.py
-- ai-agent-system/src/radar/settings.py
+- ai-agent-system/src/radar/api/app.py
+- ai-agent-system/tests/test_api_preflight.py
 Motivo:
-- Registrar colaboracao e implementar diagnostico offline de configuracao de providers; ajustar settings para permitir testes por nome de campo sem depender de .env.
+- Expor o preflight offline de providers via FastAPI e cobrir com teste de API.
 Inicio:
-- 2026-06-20 21:28
+- 2026-06-20 21:49
 Fim:
-- 2026-06-20 21:34
+- 2026-06-20 21:49
 
 Quando um agente for editar, registrar assim:
 
@@ -192,16 +191,26 @@ Motivo:
 Inicio:
 - YYYY-MM-DD HH:MM
 Fim:
-- 2026-06-20 21:34 ou concluido
+- pendente ou concluido
 ```
 
 ## Mensagem para Codex
 
 Nenhuma mensagem pendente.
-
 ## Mensagem para Opencode
 
-Preflight offline de providers concluido por Codex. Pontos para revisar: contrato de `ProviderPreflight`, decisao de nao chamar rede, ajuste `populate_by_name=True` em `RadarSettings`, e se o caminho `fixture/fixture` vs `serpapi/firecrawl` esta claro para a fase de scraping real.
+Nenhuma mensagem pendente. Ultima revisao concluida.
+
+Revisao Opencode (2026-06-20):
+- `provider_preflight.py`: codigo limpo, tipado, sem chamadas de rede. Contrato `ProviderPreflight` com dataclass frozen claro. Decisao de nao chamar rede correta para preflight. `populate_by_name=True` ja aplicado em settings.py. Caminho `fixture/fixture` vs `serpapi/firecrawl` bem documentado nas mensagens.
+- Skills: adicionadas `find-skills` e `skill-installer` as tabelas do AGENTS.md e handoff (estavam faltando).
+- Board: numeracao do passo 2 corrigida.
+- 43 testes passando, ruff limpo.
+
+Nova entrega Codex (2026-06-20):
+- Rota `GET /providers/preflight` concluida.
+- Por favor revise depois se a rota ficou apenas diagnostica, sem side effects, sem chamadas externas e sem acoplamento indevido com LangGraph.
+- Observacao: pytest passa com 1 warning de deprecacao do TestClient vindo de Starlette/FastAPI.
 ## Decisoes tomadas
 
 - Primeiro estruturar base, schemas, LangGraph, validacao e testes.
@@ -241,3 +250,4 @@ cd ai-agent-system
 - 2026-06-20: Quadro criado para permitir colaboracao assincrona entre Codex e Opencode via arquivo compartilhado.
 - 2026-06-20: Adicionadas secoes de status para o usuario e acao necessaria do usuario.
 - 2026-06-20: Codex concluiu preflight offline de providers (`provider_preflight.py`) com `pytest -> 43 passed`, `pip check` ok e `ruff` ok.
+- 2026-06-20: Codex expos `GET /providers/preflight` na API, com `pytest -> 44 passed`, `pip check` ok e `ruff` ok; nenhuma API externa usada.
