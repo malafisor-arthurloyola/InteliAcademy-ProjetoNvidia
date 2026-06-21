@@ -1,2 +1,31 @@
-"""Database integration placeholders."""
+from radar.database.repository import (
+    get_all_runs,
+    get_all_startups,
+    get_run_by_id,
+    get_run_recommendations,
+    get_startup_by_id,
+    init_db,
+    save_evidence_claim,
+    save_recommendation,
+    save_run,
+    save_source_document,
+    save_startup,
+    save_validation,
+    update_run_status,
+)
 
+__all__ = [
+    "init_db",
+    "save_run",
+    "update_run_status",
+    "save_startup",
+    "save_source_document",
+    "save_evidence_claim",
+    "save_validation",
+    "save_recommendation",
+    "get_all_runs",
+    "get_run_by_id",
+    "get_run_recommendations",
+    "get_all_startups",
+    "get_startup_by_id",
+]

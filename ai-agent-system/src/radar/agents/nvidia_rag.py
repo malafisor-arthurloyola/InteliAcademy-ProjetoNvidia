@@ -1,107 +1,8 @@
 from __future__ import annotations
 
 from radar.graph.state import RadarState
+from radar.rag.retriever import ensure_seeded, retrieve
 from radar.schemas import NvidiaKnowledgeChunk
-
-
-NVIDIA_KNOWLEDGE_BASE = [
-    {
-        "technology": "NVIDIA Inception",
-        "title": "NVIDIA Inception startup program",
-        "url": "https://www.nvidia.com/en-us/startups/",
-        "content": "Startup program for technical resources, ecosystem support, and go-to-market support.",
-        "keywords": ("startup", "ecosystem", "go-to-market", "community", "support"),
-        "relevance_score": 0.55,
-    },
-    {
-        "technology": "NVIDIA NIM",
-        "title": "NVIDIA NIM for optimized AI inference services",
-        "url": "https://www.nvidia.com/en-us/ai-data-science/products/nim-microservices/",
-        "content": "NIM provides optimized inference microservices for deploying generative AI models.",
-        "keywords": ("llm", "generative", "agents", "automation"),
-        "relevance_score": 0.82,
-    },
-    {
-        "technology": "NeMo Guardrails",
-        "title": "NeMo Guardrails for safer AI agents",
-        "url": "https://github.com/NVIDIA/NeMo-Guardrails",
-        "content": "NeMo Guardrails helps control, constrain, and govern conversational assistants and AI agents.",
-        "keywords": ("agents", "guardrails", "workflow", "customer", "automation"),
-        "relevance_score": 0.78,
-    },
-    {
-        "technology": "NVIDIA Triton Inference Server",
-        "title": "Triton Inference Server for production serving",
-        "url": "https://developer.nvidia.com/triton-inference-server",
-        "content": "Triton standardizes scalable production model serving across frameworks.",
-        "keywords": ("production", "serving", "latency", "inference", "pipeline"),
-        "relevance_score": 0.76,
-    },
-    {
-        "technology": "TensorRT-LLM",
-        "title": "TensorRT-LLM for optimized LLM inference",
-        "url": "https://github.com/NVIDIA/TensorRT-LLM",
-        "content": "TensorRT-LLM optimizes LLM inference performance with techniques such as batching and low-latency serving.",
-        "keywords": ("llm inference", "latency", "batching", "low-latency", "performance"),
-        "relevance_score": 0.8,
-    },
-    {
-        "technology": "NVIDIA RAPIDS",
-        "title": "NVIDIA RAPIDS for accelerated data pipelines",
-        "url": "https://rapids.ai/",
-        "content": "RAPIDS accelerates data science and analytics pipelines with GPUs.",
-        "keywords": ("tabular", "analytics", "dataframe", "dataframes"),
-        "relevance_score": 0.72,
-    },
-    {
-        "technology": "cuDF",
-        "title": "cuDF for GPU dataframes",
-        "url": "https://docs.rapids.ai/api/cudf/stable/",
-        "content": "cuDF accelerates dataframe processing and tabular data preparation on GPUs.",
-        "keywords": ("dataframe", "dataframes", "tabular"),
-        "relevance_score": 0.74,
-    },
-    {
-        "technology": "cuML",
-        "title": "cuML for accelerated machine learning",
-        "url": "https://docs.rapids.ai/api/cuml/stable/",
-        "content": "cuML accelerates classical machine learning workflows on GPUs.",
-        "keywords": ("machine learning", "predictive", "tabular"),
-        "relevance_score": 0.73,
-    },
-    {
-        "technology": "NVIDIA Riva",
-        "title": "NVIDIA Riva for speech AI",
-        "url": "https://developer.nvidia.com/riva",
-        "content": "Riva supports speech AI use cases such as ASR, TTS, and voice applications.",
-        "keywords": ("voice", "speech", "transcription", "asr", "tts", "call center"),
-        "relevance_score": 0.72,
-    },
-    {
-        "technology": "NVIDIA Clara",
-        "title": "NVIDIA Clara for healthcare and life sciences",
-        "url": "https://www.nvidia.com/en-us/clara/",
-        "content": "Clara supports healthcare and life sciences AI workflows.",
-        "keywords": ("health", "healthcare", "saude", "medical", "life sciences"),
-        "relevance_score": 0.72,
-    },
-    {
-        "technology": "NVIDIA Omniverse",
-        "title": "NVIDIA Omniverse for simulation and digital twins",
-        "url": "https://www.nvidia.com/en-us/omniverse/",
-        "content": "Omniverse supports simulation, 3D workflows, and digital twins.",
-        "keywords": ("simulation", "3d", "digital twins", "industrial robots"),
-        "relevance_score": 0.75,
-    },
-    {
-        "technology": "NVIDIA Isaac",
-        "title": "NVIDIA Isaac for robotics and autonomy",
-        "url": "https://developer.nvidia.com/isaac",
-        "content": "Isaac supports robotics simulation, autonomy, and deployment workflows.",
-        "keywords": ("robotics", "robots", "autonomy", "autonomous"),
-        "relevance_score": 0.76,
-    },
-]
 
 
 def retrieve_nvidia_context(state: RadarState) -> list[NvidiaKnowledgeChunk]:
@@ -113,26 +14,52 @@ def retrieve_nvidia_context(state: RadarState) -> list[NvidiaKnowledgeChunk]:
     if not validation or not validation.has_minimum_evidence:
         return []
 
+    profiles = state.get("extracted_startups", [])
+    if not profiles:
+        return []
+
+    profile = profiles[0]
+    query_parts = []
+    if profile.sector:
+        query_parts.append(f"sector: {profile.sector}")
+    if profile.product:
+        query_parts.append(f"product: {profile.product}")
+    if profile.cited_technologies:
+        query_parts.append(f"technologies: {', '.join(profile.cited_technologies)}")
+    if profile.ai_usage_summary:
+        query_parts.append(f"ai_usage: {profile.ai_usage_summary}")
+
     supported_claims = [
         claim
         for claim in state.get("claims", [])
-        if claim.id in validation.supporting_evidence_ids
+        if claim.id in (validation.supporting_evidence_ids if validation else [])
     ]
-    signal_text = " ".join(claim.text.lower() for claim in supported_claims)
+    if supported_claims:
+        claim_text = " ".join(c.text for c in supported_claims)
+        query_parts.append(f"evidence: {claim_text[:1000]}")
 
-    chunks = [_build_chunk(NVIDIA_KNOWLEDGE_BASE[0])]
-    for item in NVIDIA_KNOWLEDGE_BASE[1:]:
-        if any(keyword in signal_text for keyword in item["keywords"]):
-            chunks.append(_build_chunk(item))
+    query = " ".join(query_parts) if query_parts else profile.description or ""
+    if not query:
+        return []
+
+    ensure_seeded()
+    results = retrieve(query, top_k=5)
+
+    chunks: list[NvidiaKnowledgeChunk] = []
+    for r in results:
+        score = r.get("score", 0.0)
+        if score < 0.3:
+            continue
+        chunk_id = str(r.get("id", "")) if r.get("id") is not None else None
+        chunks.append(
+                NvidiaKnowledgeChunk(
+                    id=chunk_id,
+                    technology=r.get("technology", ""),
+                    title=r.get("title", ""),
+                    url=r.get("url", ""),
+                    content=r.get("content", ""),
+                    relevance_score=score,
+                )
+            )
 
     return chunks
-
-
-def _build_chunk(item: dict[str, object]) -> NvidiaKnowledgeChunk:
-    return NvidiaKnowledgeChunk(
-        technology=item["technology"],
-        title=item["title"],
-        url=item["url"],
-        content=item["content"],
-        relevance_score=item["relevance_score"],
-    )

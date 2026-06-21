@@ -717,4 +717,175 @@ tests/test_llm_adapters.py: 15 tests
 
 Total: 92 tests passing (era 77)
 ruff -> All checks passed
+
+---
+
+## 2026-06-21 — RAG Enricher + Persistência SQLite + FastAPI CRUD
+
+### Resumo executivo
+
+Nesta sessão, o RAG foi enriquecido com capacidade de buscar documentação real da NVIDIA via trafilatura, chunkificar e inserir no Qdrant. A persistência foi implementada com SQLite (6 tabelas) e a API FastAPI ganhou endpoints CRUD completos com persistência automática do pipeline. Total: **145 testes passando**, ruff limpo.
+
+### Commits
+
+```text
+(sem novo commit — código ainda não commitado)
+```
+
+### Fase 3b — RAG Enricher
+
+**`src/radar/rag/enricher.py`** — novo módulo para enriquecer a base de conhecimento NVIDIA:
+
+- `fetch_doc_text(url)`: baixa texto de páginas via **trafilatura** (sem headless browser, leve)
+- `chunk_text(text, chunk_size=500, overlap=50)`: chunkificação por parágrafos com overlapping para contexto
+- `_resolve_chunk_technology(url)`: mapeia URL para tecnologia NVIDIA (NIM, TensorRT, cuDF, RAPIDS, CUDA, Riva, Omniverse, Isaac, Clara, etc.)
+- `enrich_from_urls(urls)`: pipeline completo — fetch → chunk → embed → insert no Qdrant
+- `enrich_nvidia_docs()`: chamada conveniente com 14 URLs pré-configuradas de `docs.nvidia.com`
+
+**Decisões técnicas:**
+- Seed de 16 chunks existente permanece intocado (IDs 1-16)
+- Chunks novos recebem IDs auto-incrementais a partir de 1000
+- URLs seed são automaticamente ignoradas para evitar duplicatas
+- trafilatura escolhido por ser mais leve que Playwright para documentação textual
+
+**Arquivos alterados/criados:**
+
+```text
+src/radar/rag/enricher.py            (criado)
+src/radar/rag/__init__.py            (modificado)
+src/radar/rag/retriever.py           (modificado — get_store público)
+tests/test_rag_enricher.py           (criado — 16 testes)
+```
+
+### Fase 4 — SQLite + FastAPI CRUD
+
+**`src/radar/database/connection.py`**: SQLite com WAL mode, foreign keys, context manager via `get_connection()`.
+
+**`src/radar/database/repository.py`**: 6 tabelas com CRUD completo:
+
+```text
+startups            — perfil + classificação, upsert por nome
+runs                — query, status, timestamps
+source_documents    — URLs, domínios, textos coletados
+evidence_claims     — claims extraídos por fonte
+validations         — relatório de validação por run
+recommendations     — tecnologia, gaps, prioridade, evidências
+```
+
+**`src/radar/api/app.py`** — endpoints expandidos:
+
+```text
+POST /runs           — executa pipeline e persiste resultado automaticamente
+GET /runs            — lista todas as execuções
+GET /runs/{id}       — detalhe da execução com recomendações
+GET /startups        — lista startups analisadas
+GET /startups/{id}   — detalhe da startup
+```
+
+O fluxo de persistência (`_persist_run_result`) salva startup, fontes, claims, validação e recomendações em uma única transação.
+
+**Arquivos criados/alterados:**
+
+```text
+src/radar/database/__init__.py       (modificado)
+src/radar/database/connection.py     (criado)
+src/radar/database/repository.py     (criado)
+src/radar/api/app.py                 (modificado — lifespan, CRUD, persist)
+tests/test_database.py               (criado — 12 testes)
+tests/test_api_crud.py               (criado — 9 testes)
+```
+
+### Testes
+
+```text
+tests/test_rag_enricher.py:   16 tests  (chunk, resolve tech, enrich, skip seed, fetch fail)
+tests/test_database.py:       12 tests  (init, save/get run, startup upsert, rec, source, claim, validation)
+tests/test_api_crud.py:        9 tests  (health, preflight, list runs/startups, 404, run analysis, persist+query)
+
+Total: 145 tests passing (era 92)
+ruff -> All checks passed
+```
+
+### Skills
+
+Nenhuma skill nova criada nesta sessão. As skills existentes (`langgraph-nvidia-startup-radar`, `windows-powershell-repo-hygiene`, `obsidian-learning-notes`) foram suficientes.
+
+### Próximos passos
+
+```text
+Fase 1: Scraping real (FINALIZADA)
+Fase 2: LLM no Extractor e Classifier (FINALIZADA)
+Fase 3: RAG NVIDIA real — Qdrant + sentence-transformers + enricher (FINALIZADA)
+Fase 4a: SQLite + FastAPI CRUD (FINALIZADA)
+Fase 4b: Frontend dashboard (EM ANDAMENTO — integração API + loading states)
+```
+
+---
+
+## 2026-06-21 (Segunda sessão do dia)
+
+### Resumo executivo
+
+Nesta sessão, o frontend Lovable foi baixado e movido para `frontend/`, o ícone `TophIcon.png` foi adicionado à raiz, e foi planejada a integração do frontend com a API real, com loading states visuais para quando a IA está "pensando".
+
+### O que foi feito
+
+#### Frontend base adicionado
+
+Site Lovable baixado pelo usuário e movido para `frontend/` (renomeado de `frontendcodigo/`):
+
+- Projeto TanStack React + shadcn/ui + Recharts
+- 7 páginas (Overview, Ranking, Startup Detail, Briefing, Pipeline, Sources, Contacts)
+- `npm install` executado pelo usuário (após reclamação de que o agente baixou sem avisar)
+- `bun install` crashou (segmentation fault no Windows)
+
+#### Ícone Toph
+
+Arquivo `TophIcon.png` adicionado à raiz do projeto (1.3 MB). Será usado como favicon e ícone do app frontend.
+
+#### Plano de integração API real
+
+Plano detalhado aprovado pelo usuário:
+
+1. **api.ts** — cliente HTTP tipado com `fetch` nativo para os 7 endpoints do backend
+2. **Hooks React Query** — `useStartups()`, `useRuns()`, `useRun(id)`, `useSubmitRun()`, `useHealth()`
+3. **ApiErrorDisplay** — componente que mostra erro EXATO (endpoint, status code, mensagem) quando API não está rodando
+4. **PipelineStatus** — pipeline visual animado com 8 steps, pulse, polling a cada 2s, badge "IA processando..."
+5. **Adaptação página a página** — Pipeline primeiro (maior impacto), depois Overview + Ranking + Startup Detail, depois Briefing + Sources + Contacts
+6. **Fallback progressivo** — em vez de mock, mostra erro explícito com código
+
+#### Decisões de design (frontend-design skill)
+
+- Direção: **Toph — radar sísmico, visual de comando/controle**
+- Dark theme denso, dados à mostra
+- Acento NVIDIA verde (#76B900) + alertas laranja/vermelho
+- Sem gradients roxos, glassmorphism ou blobs decorativos (anti-AI-slop)
+- Loading states com propósito: skeleton pulse, pipeline steps animados
+- Erro honesto: código HTTP + endpoint + mensagem, sem esconder
+
+#### Handoff atualizado
+
+Handoff consolidado no final deste relatório (não mais em arquivo separado).
+
+### Testes
+
+Nenhum teste novo nesta sessão (foco em planejamento frontend).
+
+Total: 145 tests passing (inalterado)
+
+### Skills
+
+Skill `frontend-design` consultada para guiar decisões estéticas e de UX.
+
+### Próximos passos
+
+```text
+1. Commit + push do estado atual (gitignore, relatório, frontend base, TophIcon)
+2. Criar api.ts + hooks (useRuns, useStartups, useHealth)
+3. Criar ApiErrorDisplay + PipelineStatus components
+4. Adaptar Pipeline page (loading AI animado + polling)
+5. Adaptar Overview + Ranking + Startup Detail
+6. Adaptar Briefing + Sources + Contacts
+7. Frontend integrado com API real rodando
+```
 ```
