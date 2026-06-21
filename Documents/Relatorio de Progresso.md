@@ -915,3 +915,42 @@ Skill `frontend-design` consultada para guiar decisões estéticas e de UX. Skil
 5. Considerar adicionar Subscription ao backend (WebSocket) para pipeline em tempo real
 ```
 ```
+## 2026-06-21 (Correção RAG/API)
+
+### Resumo executivo
+
+Foi feita uma revisão nos arquivos `ai-agent-system/src/radar/agents/nvidia_rag.py` e `ai-agent-system/src/radar/api/app.py`, que estavam aparecendo com erros no editor. A execução estava saudável, mas havia pontos que poderiam gerar alertas de tipagem/serialização no IDE.
+
+### O que foi corrigido
+
+- `nvidia_rag.py`: normalização explícita dos resultados vindos do Qdrant antes de montar `NvidiaKnowledgeChunk`.
+  - Score convertido e limitado entre 0.0 e 1.0.
+  - Tecnologia validada contra o `Literal` `NvidiaTechnology`.
+  - Campos textuais convertidos de forma segura.
+- `api/app.py`: retorno de `POST /runs` tipado como `dict[str, Any]` e serializado com `jsonable_encoder`, deixando o payload mais claro para FastAPI/editor.
+- `agent-collaboration-board.md`: tarefa registrada e encerrada.
+
+### Validações
+
+```text
+pip check -> No broken requirements found.
+ruff check src/radar tests -> All checks passed.
+pytest -> 145 passed, 2 warnings conhecidos.
+```
+
+Warnings conhecidos:
+- `StarletteDeprecationWarning` do `TestClient`.
+- `FutureWarning` do pacote `google.generativeai`.
+
+### Commit
+
+```text
+f7ccd64 fix: normalize rag and api response typing
+```
+
+### Próximos passos sugeridos
+
+1. Rodar backend e frontend juntos localmente.
+2. Testar `POST /runs` pela tela Pipeline e confirmar se o frontend recebe o resultado serializado sem erros.
+3. Trocar mocks remanescentes de Overview/Ranking/Detail por dados reais da API.
+4. Depois, avaliar WebSocket ou Server-Sent Events para status em tempo real do pipeline.
