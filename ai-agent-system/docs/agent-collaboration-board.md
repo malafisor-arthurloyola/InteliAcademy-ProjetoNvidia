@@ -17,7 +17,7 @@ Ele nao substitui o handoff unico do Obsidian. Use este arquivo como canal de tr
 3. Leia este quadro inteiro.
 4. Atualize apenas a sua area ou a area explicitamente combinada.
 5. Declare quais arquivos pretende tocar antes de editar codigo.
-6. Nao use APIs externas sem autorizacao explicita do usuario.
+6. Firecrawl autorizado com `RADAR_ENABLE_EXTERNAL_PROVIDERS=true`. Outras APIs externas sem autorizacao explicita do usuario.
 7. Use sempre o Python do venv do projeto.
 8. Nao commite segredos, `.env`, `venv`, caches ou arquivos sensiveis.
 
@@ -248,3 +248,4 @@ cd ai-agent-system
 - 2026-06-20: Codex adicionou adapter offline de HTML bruto com BeautifulSoup; validacoes: pip check ok, pytest 46 passed, ruff ok; nenhuma API externa usada.
 - 2026-06-20: Agente unico melhorou Extractor (setor, produto, founders, funding, tecnologias) e Classifier (scoring multidimensional, thresholds) — pytest 64 passed, ruff ok, 18 novos testes.
 - 2026-06-20: FirecrawlSearchAdapter e FirecrawlPageAdapter reais implementados. Pipeline end-to-end testado com dados reais: 7 fontes, classificacao AI-Native 95%. pytest 68 passed, ruff ok.
+- 2026-06-20: skill `firecrawl-skill` criada, README atualizado com setup de env/API keys/safety switch, Relatorio de Progresso atualizado, Handoff atualizado, .env.example atualizado com firecrawl provider options, Obsidian note "Firecrawl Setup.md" criada.

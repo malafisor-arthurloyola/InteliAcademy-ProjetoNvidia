@@ -25,6 +25,7 @@ Whenever a skill is created, downloaded, renamed, or removed under `ai-agent-sys
 | `skill-creator` | Local copy of Codex skill | Guides creation or update of Codex skills. | Use when formalizing a project workflow, domain rule, or reusable procedure as a skill. | Installed |
 | `skill-installer` | Local copy of Codex skill | Installs skills from curated lists or GitHub paths. | Use when downloading skills into this project or into the Codex global skills directory. | Installed |
 | `windows-powershell-repo-hygiene` | Local project skill | Keeps Windows/PowerShell edits, encoding, venv validation, git staging, commits, and pushes safe when the sandbox or shell path is involved. | Use when recovering from Windows sandbox failures, editing with PowerShell, checking encoding/BOM issues, running venv tests, or preparing git commits/pushes. | Created locally |
+| `firecrawl-skill` | Local project skill | Guides Firecrawl integration for web search and page scraping in the NVIDIA Startup AI Radar. | Use when implementing, configuring, testing, or debugging Firecrawl search (search) and page extraction (scrape_url). | Created locally |
 
 ## Maintenance Checklist
 

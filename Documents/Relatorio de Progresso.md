@@ -524,3 +524,106 @@ ruff -> All checks passed
 Commit: `bc49a12 feat: add fail-closed safety switch for external providers`
 
 Nota: `docs/guia-transicao-placeholders-para-producao.md` foi criado e depois removido por ser redundante com o handoff.
+
+---
+
+## 2026-06-20 — Scraping real (Firecrawl), Extractor, Classifier
+
+### Resumo executivo
+
+Nesta sessão, o projeto saiu dos mocks offline para scraping real com Firecrawl. O extrator e classificador foram refinados com scoring multidimensional. O pipeline end-to-end foi validado com dados reais: 7 fontes coletadas, classificação AI-Native com 95% de confiança, tecnologias NVIDIA detectadas (Clara, Riva, RAG), setor, funding e founders identificados. Total de 68 testes passando.
+
+### Commits
+
+```text
+8119210 feat: adapt offline html page content to source document
+182f3db feat: improve extractor and classifier with multidimensional scoring
+17d04cc docs: record collaboration review guidance for agents
+fd1b953 feat: firecrawl real search and page adapters with provider factory
+53038c0 fix: firecrawl sdk api
+68c9ee2 docs: update collaboration board with skills requirement
+```
+
+### O que foi feito
+
+#### Extractor (src/radar/agents/extractor.py)
+
+- Extração estruturada de **setor** (13 categorias: Healthcare, Fintech, Agrotech, Edtech, Logistics, Retail, Legal, Real Estate, Energy, Security, Entertainment, Developer Tools, Other)
+- **Produto**: regex para product/platform/solution/produto/ferramenta
+- **Founders**: padroes founder/ceo/cto/co-founder/fundador
+- **Funding**: padroes raised/seed/series A-Z
+- **Tecnologias**: 21 keywords (NVIDIA: CUDA, TensorRT-LLM, Triton, NeMo, RAPIDS, Omniverse, Isaac, Clara, Morpheus, Riva, AI Enterprise, Inception; Gerais: LLM, LangChain, RAG, Vector DB, PyTorch, HF, GPU Inference, etc.)
+- **ai_usage_summary** gerado quando há claim de IA
+
+#### Classifier (src/radar/agents/classifier.py)
+
+Classificação deterministica refinada com scoring multidimensional:
+
+- **AI-Native score**: dados proprietários, fine-tuning, multi-agent, NVIDIA techs
+- **AI-Enabled score**: uso de API/LLM, automação, workflow, techs genéricas
+- **Evidence quality score**: quantidade e tipos de claims e sources
+- **Business maturity score**: funding, founders, setor identificado
+- Thresholds: AI-Enabled a partir de 1.5 combinado ou NVIDIA techs presentes
+- **Caveats dinâmicos**: alerta se startup já cita tecnologias NVIDIA
+
+#### Firecrawl real
+
+- `FirecrawlSearchAdapter`: busca real via `firecrawl.Firecrawl().search()`, normaliza em `SourceCandidate`
+- `FirecrawlPageAdapter`: scrape real via `firecrawl.Firecrawl().scrape_url()`, extrai markdown/HTML, normaliza em `SourceDocument`
+- `provider_factory.py`: suporta `firecrawl/firecrawl` como configuração primária; `serpapi/firecrawl` mantido como fallback
+- `provider_preflight.py`: atualizado para verificar credenciais apenas do provider configurado (não ambos); suporta combinação `firecrawl/firecrawl`
+- `settings.py`: `SearchProviderName` agora inclui `"firecrawl"`; `.env` movido para raiz do repositório (evita poluição no CWD dos testes)
+- Pipeline end-to-end com Firecrawl real: 7 fontes coletadas, classificação AI-Native 95%
+
+#### Agentes e grafo
+
+- **Evidence Validator** (src/radar/agents/validator.py): `MINIMUM_CLAIMS=2`, `MINIMUM_AI_CLAIMS=1`, `MINIMUM_CONFIDENCE=0.5`
+- **Recommendation** (src/radar/agents/recommendation.py): mapeia 12 tecnologias NVIDIA com gap técnico, justificativas, prioridade, complexidade, próxima ação
+- **NVIDIA RAG** (src/radar/agents/nvidia_rag.py): contexto determinístico de NVIDIA Inception se startup não for Non-AI
+- **Briefing** (src/radar/agents/briefing.py): briefing final com caveats quando evidência é fraca
+- **API** (src/radar/api/app.py): FastAPI com GET /health e GET /providers/preflight
+
+#### Testes
+
+```text
+tests/test_extractor.py: 11 tests (setor, produto, founders, funding, tecnologias, dedup, summary)
+tests/test_classifier.py: 7 tests (AI-Native, AI-Enabled, Non-AI, NVIDIA caveats, funding boost, rationale, confidence bounds)
+tests/test_provider_factory.py: 5 tests
+tests/test_provider_preflight.py: 7 tests (multi-provider, firecrawl config, varredura)
+tests/test_scraping_adapters.py: firecrawl real + firecrawl safety switch
+tests/test_graph_mvp.py, test_source_normalizers.py, test_evidence_pipeline.py,
+test_recommendation_mapping.py, test_retry_policy.py, test_briefing.py,
+test_external_provider_settings.py, test_api_preflight.py
+
+Total: 68 tests passing, ruff clean
+```
+
+#### Skills
+
+- `firecrawl-skill` criada em `ai-agent-system/skills/firecrawl-skill/SKILL.md`
+- `SKILLS_INDEX.md` atualizado com `firecrawl-skill` na tabela
+
+#### Obsidian e documentação
+
+- Nota `Firecrawl Setup.md` criada no vault com setup, safety switch, exemplos de uso
+- `README.md` atualizado com seção de configuração de API externa, tabela de providers
+- `Handoff` atualizado com progresso do Firecrawl real
+
+### Experimentos e decisões
+
+- Firecrawl escolhido como **provider único** (search + page) por ser gratuito e estar no documento-fonte
+- `.env` movido para **raiz do repositório** (não mais dentro de `ai-agent-system/`) porque pytest roda de `ai-agent-system/` mas o `BaseSettings` busca no CWD
+- SerpAPI mantido como fallback alternativo, mas não como primary
+- Placeholders (StaticSeedCollector, HtmlPageContentAdapter) mantidos como mocks permanentes de teste
+- Safety switch continua fail-closed: só Firecrawl roda com autorização explícita
+
+### Próximos passos
+
+```text
+Fase 1: Scraping real (FINALIZADA — Firecrawl operacional)
+Fase 2: Instalar Playwright + trafilatura para complementar Firecrawl free tier
+Fase 3: LLM no Extractor e Classifier
+Fase 4: RAG NVIDIA real (Qdrant in-memory + sentence-transformers)
+Fase 5: Persistência (SQLite) e frontend
+```
+
