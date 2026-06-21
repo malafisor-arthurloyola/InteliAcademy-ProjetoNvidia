@@ -131,23 +131,34 @@ class FirecrawlSearchAdapter:
         from firecrawl import Firecrawl
 
         client = Firecrawl(api_key=self._settings.firecrawl_api_key)
-        response = client.search(
-            query=plan.query,
-            origin="api",
-            limit=10,
-        )
+        response = client.search(query=plan.query, limit=10)
 
-        raw_results = response.get("data", [])
         candidates = []
-        for i, item in enumerate(raw_results):
-            url = item.get("url") or item.get("link")
-            if not url:
-                continue
-            candidates.append(
-                _firecrawl_result_to_candidate(item, url, i + 1)
-            )
+        for item in (response.web or []):
+            candidates.append({
+                "url": item.url,
+                "title": item.title or "",
+                "description": item.description or "",
+                "source_type": _infer_source_type_from_url(item.url),
+                "rank": len(candidates) + 1,
+            })
+        for item in (response.news or []):
+            candidates.append({
+                "url": item.url,
+                "title": item.title or "",
+                "description": item.snippet or "",
+                "source_type": "news",
+                "rank": len(candidates) + 1,
+            })
+
         return normalize_search_result_payloads(
-            [_candidate_to_payload(c) for c in candidates],
+            [{  # normalize_search_result_payload expects specific keys
+                "link": c["url"],
+                "title": c["title"],
+                "snippet": c["description"],
+                "kind": c["source_type"],
+                "rank": c["rank"],
+            } for c in candidates],
             provider=self.provider,
         )
 
@@ -167,32 +178,23 @@ class FirecrawlPageAdapter:
         from firecrawl import Firecrawl
 
         client = Firecrawl(api_key=self._settings.firecrawl_api_key)
-        response = client.scrape_url(
+        doc = client.scrape_url(
             url=str(candidate.url),
             formats=["markdown", "rawHtml"],
             only_main_content=True,
         )
 
-        data = response.get("data", {})
-        markdown = data.get("markdown", "")
-        raw_html = data.get("rawHtml", "")
+        text = doc.markdown or ""
+        if not text and doc.raw_html:
+            _, text = _extract_html_text(doc.raw_html)
 
-        if not markdown and raw_html:
-            _, text = _extract_html_text(raw_html)
-        else:
-            text = markdown or ""
-
-        title = (
-            data.get("metadata", {}).get("title")
-            or data.get("title")
-            or candidate.title
-        )
+        title = (doc.metadata.title if doc.metadata and doc.metadata.title else candidate.title) or ""
 
         payload = {
             "url": str(candidate.url),
             "title": title,
             "text": text,
-            "source_type": _infer_source_type(candidate),
+            "source_type": str(candidate.source_type),
         }
         return normalize_collected_page_payload(
             payload,
@@ -248,31 +250,6 @@ def _ensure_api_key(api_key: str | None, provider: str) -> None:
         raise ExternalProviderCredentialsError(
             f"{provider} is enabled but no API key was configured."
         )
-
-
-def _firecrawl_result_to_candidate(item: dict, url: str, rank: int) -> dict:
-    return {
-        "url": url,
-        "title": item.get("title", ""),
-        "description": item.get("description", "") or item.get("snippet", ""),
-        "source_type": _infer_source_type_from_url(url),
-        "rank": rank,
-    }
-
-
-def _candidate_to_payload(candidate: dict) -> dict:
-    return {
-        "link": candidate["url"],
-        "title": candidate["title"],
-        "snippet": candidate["description"],
-        "kind": candidate.get("source_type", "other"),
-    }
-
-
-def _infer_source_type(candidate: SourceCandidate) -> str:
-    """Infer source type from candidate metadata."""
-    raw = candidate.raw or {}
-    return raw.get("source_type", "other")
 
 
 def _infer_source_type_from_url(url: str) -> str:
