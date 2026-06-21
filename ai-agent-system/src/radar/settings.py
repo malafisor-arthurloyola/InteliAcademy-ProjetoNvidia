@@ -19,6 +19,7 @@ class RadarSettings(BaseSettings):
         env_file=".env",
         env_prefix="RADAR_",
         extra="ignore",
+        populate_by_name=True,
     )
 
     enable_external_providers: bool = False
