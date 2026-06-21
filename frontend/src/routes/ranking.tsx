@@ -9,8 +9,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ScoreBar, MaturityBadge, CompanyLogo, ContactStatusBadge } from "@/components/ui-bits";
 import { useContacts } from "@/lib/contacts-store";
+import { useHealth } from "@/lib/hooks/use-health";
+import { ApiErrorDisplay } from "@/components/api-error-display";
 import { ArrowRight, Filter } from "lucide-react";
 
 export const Route = createFileRoute("/ranking")({
@@ -46,6 +49,7 @@ function CheckRow<T extends string>({ value, label, set, current }: { value: T; 
 
 function Ranking() {
   const contacts = useContacts();
+  const { data: health, error: healthError, refetch: retryHealth } = useHealth();
   const [search, setSearch] = useState("");
   const [maturity, setMaturity] = useState<AIMaturity[]>([]);
   const [sectors, setSectors] = useState<string[]>([]);
@@ -72,6 +76,28 @@ function Ranking() {
       return true;
     });
   }, [search, maturity, sectors, regions, yearRange, minGrowth, minContact, minEvidence, techs, sourceTypes]);
+
+  if (healthError) {
+    return (
+      <div className="mx-auto w-full max-w-[1600px] p-4 md:p-6">
+        <ApiErrorDisplay error={healthError as any} onRetry={() => retryHealth()} />
+      </div>
+    );
+  }
+
+  if (!health) {
+    return (
+      <div className="mx-auto w-full max-w-[1600px] p-4 md:p-6">
+        <Card className="p-4">
+          <div className="space-y-3">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto grid w-full max-w-[1600px] gap-4 p-4 md:p-6 lg:grid-cols-[280px_minmax(0,1fr)]">

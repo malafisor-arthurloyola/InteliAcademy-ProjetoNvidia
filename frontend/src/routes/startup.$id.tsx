@@ -4,6 +4,7 @@ import { getCompanyExtras } from "@/lib/company-extras";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -51,6 +52,8 @@ import {
   useContact,
   type ContactStatus,
 } from "@/lib/contacts-store";
+import { useHealth } from "@/lib/hooks/use-health";
+import { ApiErrorDisplay } from "@/components/api-error-display";
 import { useState, useEffect } from "react";
 
 export const Route = createFileRoute("/startup/$id")({
@@ -82,6 +85,7 @@ function StartupPage() {
   const s = Route.useLoaderData() as Startup;
   const extras = getCompanyExtras(s.id);
   const contact = useContact(s.id);
+  const { data: health, error: healthError, refetch: retryHealth } = useHealth();
   const [note, setNote] = useState(contact.note ?? "");
   useEffect(() => setNote(contact.note ?? ""), [s.id, contact.note]);
 
@@ -89,6 +93,34 @@ function StartupPage() {
   const first = extras.growth[0];
   const valuationDelta = Math.round(((latest.valuationM - first.valuationM) / first.valuationM) * 100);
   const arrDelta = Math.round(((latest.arrM - first.arrM) / first.arrM) * 100);
+
+  if (healthError) {
+    return (
+      <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
+        <ApiErrorDisplay error={healthError as any} onRetry={() => retryHealth()} />
+      </div>
+    );
+  }
+
+  if (!health) {
+    return (
+      <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
+        <Card className="p-5">
+          <div className="space-y-3">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-12 w-12 rounded-full" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5 p-4 md:p-6">

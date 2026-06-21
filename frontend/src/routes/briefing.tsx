@@ -2,11 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
 import { startups } from "@/lib/mock-data";
 import { MaturityBadge, ScoreBar, SectionTitle } from "@/components/ui-bits";
-import { Copy, Download, Save, Database } from "lucide-react";
+import { useHealth } from "@/lib/hooks/use-health";
+import { ApiErrorDisplay } from "@/components/api-error-display";
+import { Copy, Download, Save, Database, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/briefing")({
@@ -16,10 +19,35 @@ export const Route = createFileRoute("/briefing")({
 
 function BriefingPage() {
   const [id, setId] = useState(startups[0].id);
+  const { data: health, error: healthError, refetch: retryHealth } = useHealth();
+  const apiOk = health?.status === "ok";
   const s = startups.find((x) => x.id === id)!;
 
   const summary =
     `Briefing — ${s.name}\nSetor: ${s.sector} | Região: ${s.region} | Fundada em ${s.foundedYear}\nClassificação: ${s.maturity}\nRadar: ${s.radarScore} | NVIDIA fit: ${s.nvidiaFit} | Evidence: ${s.evidenceConfidence}\n\n${s.executiveSummary}\n\nRecomendações: ${s.recommendations.map((r) => r.tech).join(", ")}`;
+
+  if (healthError) {
+    return (
+      <div className="mx-auto w-full max-w-5xl p-4 md:p-6">
+        <ApiErrorDisplay error={healthError as any} onRetry={() => retryHealth()} />
+      </div>
+    );
+  }
+
+  if (!health) {
+    return (
+      <div className="mx-auto w-full max-w-5xl p-4 md:p-6">
+        <Card className="p-6">
+          <div className="space-y-3">
+            <Skeleton className="h-6 w-64" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5 p-4 md:p-6">
@@ -29,8 +57,8 @@ function BriefingPage() {
           <p className="text-xs text-muted-foreground">Documento de abordagem comercial e técnica para NVIDIA Startups & VCs.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="gap-1 border-primary/30 bg-primary/5 text-[10px] text-primary">
-            <Database className="h-3 w-3" /> Demo data
+          <Badge variant="outline" className={`gap-1 text-[10px] ${apiOk ? "border-green-500/30 bg-green-500/5 text-green-600" : "border-primary/30 bg-primary/5 text-primary"}`}>
+            {apiOk ? <><CheckCircle2 className="h-3 w-3" /> API ativa</> : <><Database className="h-3 w-3" /> Demo data</>}
           </Badge>
           <Select value={id} onValueChange={setId}>
             <SelectTrigger className="h-9 w-[220px]"><SelectValue /></SelectTrigger>

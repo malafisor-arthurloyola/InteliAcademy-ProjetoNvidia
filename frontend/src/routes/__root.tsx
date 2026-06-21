@@ -58,7 +58,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "NVIDIA Toph — Brazilian AI Startups Intelligence" },
       { name: "description", content: "Plataforma interna para identificar, analisar e priorizar startups brasileiras AI-native, com evidências rastreáveis e recomendações de tecnologias NVIDIA." },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", type: "image/png", href: "/icon.png" },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,

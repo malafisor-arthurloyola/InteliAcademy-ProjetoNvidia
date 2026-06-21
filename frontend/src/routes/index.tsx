@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Search, Sparkles, BarChart3, FileSearch, FileText, TrendingUp, ShieldCheck, Cpu, Database, ArrowRight, Handshake } from "lucide-react";
+import { Search, Sparkles, BarChart3, FileSearch, FileText, TrendingUp, ShieldCheck, Cpu, Database, ArrowRight, Handshake, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -9,6 +9,8 @@ import { startups, overviewMetrics, maturityDistribution } from "@/lib/mock-data
 import { sectorDistribution, regionDistribution, weeklyActivity, pipelineFunnel } from "@/lib/company-extras";
 import { ScoreBar, MaturityBadge, SectionTitle, CompanyLogo, ContactStatusBadge } from "@/components/ui-bits";
 import { useContacts } from "@/lib/contacts-store";
+import { useHealth } from "@/lib/hooks/use-health";
+import { ApiErrorDisplay } from "@/components/api-error-display";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -49,6 +51,8 @@ function Overview() {
   const [q, setQ] = useState("");
   const contacts = useContacts();
   const top = [...startups].sort((a, b) => b.radarScore - a.radarScore).slice(0, 4);
+  const { data: health, error: healthError, refetch: retryHealth } = useHealth();
+  const apiOk = health?.status === "ok";
 
   const onAnalyze = () => {
     const match = startups.find((s) => s.name.toLowerCase().includes(q.toLowerCase())) ?? startups[0];
@@ -56,6 +60,17 @@ function Overview() {
   };
 
   const totalMaturity = maturityDistribution.reduce((acc, m) => acc + m.value, 0);
+
+  if (healthError && !apiOk) {
+    return (
+      <div className="mx-auto w-full max-w-7xl space-y-5 p-4 md:p-6">
+        <ApiErrorDisplay
+          error={healthError as { endpoint: string; status: number; message: string }}
+          onRetry={() => retryHealth()}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6">
@@ -65,8 +80,8 @@ function Overview() {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="truncate text-base font-semibold text-foreground md:text-lg">Radar de startups brasileiras AI-native</h1>
-              <Badge variant="outline" className="gap-1 border-primary/30 bg-primary/5 text-[10px] text-primary">
-                <Database className="h-3 w-3" /> Demo data
+              <Badge variant="outline" className={`gap-1 text-[10px] ${apiOk ? "border-green-500/30 bg-green-500/5 text-green-600" : "border-primary/30 bg-primary/5 text-primary"}`}>
+                {apiOk ? <><CheckCircle2 className="h-3 w-3" /> API ativa</> : <><Database className="h-3 w-3" /> Demo data</>}
               </Badge>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">Apenas dados públicos. Toda recomendação NVIDIA é justificada e rastreável até a fonte.</p>

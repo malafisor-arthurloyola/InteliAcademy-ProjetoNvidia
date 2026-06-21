@@ -2,9 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { sources } from "@/lib/mock-data";
 import { ScoreBar, StatusDot } from "@/components/ui-bits";
 import { useMemo, useState } from "react";
+import { useHealth } from "@/lib/hooks/use-health";
+import { ApiErrorDisplay } from "@/components/api-error-display";
 import { Search } from "lucide-react";
 
 export const Route = createFileRoute("/sources")({
@@ -14,6 +17,7 @@ export const Route = createFileRoute("/sources")({
 
 function SourcesPage() {
   const [q, setQ] = useState("");
+  const { data: health, error: healthError, refetch: retryHealth } = useHealth();
   const filtered = useMemo(
     () => sources.filter((s) => s.name.toLowerCase().includes(q.toLowerCase()) || s.type.toLowerCase().includes(q.toLowerCase())),
     [q],
@@ -25,6 +29,30 @@ function SourcesPage() {
     weak: sources.filter((s) => s.status === "fraca").length,
     contradictory: sources.filter((s) => s.status === "contraditória").length,
   };
+
+  if (healthError) {
+    return (
+      <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
+        <ApiErrorDisplay error={healthError as any} onRetry={() => retryHealth()} />
+      </div>
+    );
+  }
+
+  if (!health) {
+    return (
+      <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
+        <Card className="p-4">
+          <div className="space-y-3">
+            <Skeleton className="h-5 w-48" />
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {[1,2,3,4].map(i => <Skeleton key={i} className="h-20" />)}
+            </div>
+            <Skeleton className="h-64 w-full" />
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5 p-4 md:p-6">

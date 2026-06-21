@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -20,6 +21,8 @@ import {
 } from "@/lib/contacts-store";
 import { CompanyLogo, ContactStatusBadge, SectionTitle } from "@/components/ui-bits";
 import { getCompanyExtras } from "@/lib/company-extras";
+import { useHealth } from "@/lib/hooks/use-health";
+import { ApiErrorDisplay } from "@/components/api-error-display";
 import { ArrowRight, Mail, Phone, Handshake } from "lucide-react";
 
 export const Route = createFileRoute("/contacts")({
@@ -31,6 +34,7 @@ const FILTERS: (ContactStatus | "Todas")[] = ["Todas", ...CONTACT_STATUSES];
 
 function ContactsPage() {
   const contacts = useContacts();
+  const { data: health, error: healthError, refetch: retryHealth } = useHealth();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Todas");
 
@@ -44,6 +48,30 @@ function ContactsPage() {
       })
       .sort((a, b) => (b.rec.updatedAt || "").localeCompare(a.rec.updatedAt || ""));
   }, [contacts, search, filter]);
+
+  if (healthError) {
+    return (
+      <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
+        <ApiErrorDisplay error={healthError as any} onRetry={() => retryHealth()} />
+      </div>
+    );
+  }
+
+  if (!health) {
+    return (
+      <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
+        <Card className="p-4">
+          <div className="space-y-3">
+            <Skeleton className="h-6 w-64" />
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+              {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-16" />)}
+            </div>
+            <Skeleton className="h-64 w-full" />
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   const counts = useMemo(() => {
     const c: Record<ContactStatus, number> = {
