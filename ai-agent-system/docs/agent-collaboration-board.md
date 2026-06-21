@@ -89,13 +89,15 @@ scraping real controlado
 Resumo atual:
 
 ```text
-Agente unico melhorou Extractor e Classifier: extracao estruturada de setor, produto, founders, funding e tecnologias NVIDIA; classificacao deterministica refinada com scoring multidimensional. Validacoes: pytest 64 passed, ruff ok. Nenhuma API externa foi usada.
+Firecrawl implementado com sucesso: pipeline real busca e extrai startups brasileiras da web.
+Teste end-to-end: 7 fontes coletadas, classificacao AI-Native 95%, tecnologias NVIDIA detectadas.
+68 testes passando, ruff limpo. Nenhum segredo commitado.
 ```
 
 Ultima atualizacao:
 
 ```text
-2026-06-20 22:35
+2026-06-20 23:15
 ```
 Proxima verificacao sugerida:
 
@@ -245,3 +247,4 @@ cd ai-agent-system
 - 2026-06-20: Opencode revisou e aprovou rota, teste e warning. Numeracao do board corrigida definitivamente.
 - 2026-06-20: Codex adicionou adapter offline de HTML bruto com BeautifulSoup; validacoes: pip check ok, pytest 46 passed, ruff ok; nenhuma API externa usada.
 - 2026-06-20: Agente unico melhorou Extractor (setor, produto, founders, funding, tecnologias) e Classifier (scoring multidimensional, thresholds) — pytest 64 passed, ruff ok, 18 novos testes.
+- 2026-06-20: FirecrawlSearchAdapter e FirecrawlPageAdapter reais implementados. Pipeline end-to-end testado com dados reais: 7 fontes, classificacao AI-Native 95%. pytest 68 passed, ruff ok.
