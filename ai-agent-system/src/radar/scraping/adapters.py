@@ -99,6 +99,54 @@ class HtmlPageContentAdapter:
         )
 
 
+class PlaywrightPageAdapter:
+    """Fetch page content via Playwright (Chromium headless) with trafilatura extraction.
+
+    Fallback for sites blocked by Firecrawl free tier. Requires Chromium installed
+    via ``playwright install chromium``.
+    """
+
+    provider = "playwright"
+
+    def __init__(self, settings: RadarSettings | None = None) -> None:
+        self._settings = settings or get_settings()
+
+    def fetch(self, candidate: SourceCandidate) -> SourceDocument:
+        _ensure_external_provider_enabled(self._settings, self.provider)
+
+        import trafilatura
+
+        from playwright.sync_api import sync_playwright
+
+        url = str(candidate.url)
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            try:
+                page.goto(url, wait_until="networkidle", timeout=self._settings.provider_timeout_seconds * 1000)
+                html = page.content()
+            finally:
+                browser.close()
+
+        text = trafilatura.extract(html, include_comments=False, include_tables=True, output_format="txt") or ""
+        if not text:
+            _, text = _extract_html_text(html)
+
+        title = candidate.title or ""
+        payload = {
+            "url": url,
+            "title": title,
+            "text": text,
+            "source_type": str(candidate.source_type),
+        }
+        return normalize_collected_page_payload(
+            payload,
+            collection_method="playwright_scrape",
+            candidate=candidate,
+        )
+
+
 class ConfiguredSerpApiSearchAdapter:
     """Boundary for future SerpAPI calls, disabled unless explicitly configured."""
 

@@ -47,10 +47,7 @@ def inspect_provider_setup(settings: RadarSettings | None = None) -> ProviderPre
             messages=("Using deterministic fixture providers; no external API calls are required.",),
         )
 
-    if search_provider == "serpapi" and page_provider == "firecrawl":
-        return _inspect_external_stack(active_settings)
-
-    if search_provider == "firecrawl" and page_provider == "firecrawl":
+    if search_provider in ("serpapi", "firecrawl") and page_provider in ("firecrawl", "playwright"):
         return _inspect_external_stack(active_settings)
 
     return ProviderPreflight(
@@ -61,7 +58,7 @@ def inspect_provider_setup(settings: RadarSettings | None = None) -> ProviderPre
         network_required=search_provider != "fixture" or page_provider != "fixture",
         messages=(
             "Unsupported provider combination. Use fixture/fixture for offline tests "
-            "or firecrawl/firecrawl for the controlled external stack.",
+            "or firecrawl/playwright for the controlled external stack.",
         ),
     )
 
@@ -112,4 +109,17 @@ def _missing_external_credentials(settings: RadarSettings, search_provider: str,
         missing.append("SERPAPI_API_KEY")
     if not settings.firecrawl_api_key and (search_provider == "firecrawl" or page_provider == "firecrawl"):
         missing.append("FIRECRAWL_API_KEY")
+    if not _has_playwright_browser() and page_provider == "playwright":
+        missing.append("CHROMIUM_BROWSER")
     return tuple(missing)
+
+
+def _has_playwright_browser() -> bool:
+    try:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            _ = p.chromium.executable_path
+            return True
+    except Exception:
+        return False

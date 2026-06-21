@@ -60,7 +60,7 @@ def test_provider_factory_rejects_mixed_provider_configuration() -> None:
     try:
         build_web_collector(settings)
     except ProviderSelectionError as exc:
-        assert "Unsupported provider combination" in str(exc)
+        assert "Unsupported" in str(exc)
     else:
         raise AssertionError("Expected ProviderSelectionError")
 

@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ProviderMode = Literal["fixture", "external"]
 SearchProviderName = Literal["fixture", "serpapi", "firecrawl"]
-PageProviderName = Literal["fixture", "firecrawl"]
+PageProviderName = Literal["fixture", "firecrawl", "playwright"]
 
 
 class RadarSettings(BaseSettings):

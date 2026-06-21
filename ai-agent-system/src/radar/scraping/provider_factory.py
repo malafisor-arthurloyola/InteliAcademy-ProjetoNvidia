@@ -3,6 +3,7 @@ from __future__ import annotations
 from radar.scraping.adapters import (
     FirecrawlPageAdapter,
     FirecrawlSearchAdapter,
+    PlaywrightPageAdapter,
 )
 from radar.scraping.collectors import SearchBackedCollector, StaticSeedCollector, WebCollector
 from radar.settings import RadarSettings, get_settings
@@ -19,25 +20,37 @@ def build_web_collector(settings: RadarSettings | None = None) -> WebCollector:
     if _uses_fixture_stack(active_settings):
         return StaticSeedCollector()
 
-    if active_settings.search_provider == "firecrawl" and active_settings.page_provider == "firecrawl":
+    page_adapter = _build_page_adapter(active_settings)
+    if active_settings.search_provider == "firecrawl":
         return SearchBackedCollector(
             search_provider=FirecrawlSearchAdapter(settings=active_settings),
-            page_provider=FirecrawlPageAdapter(settings=active_settings),
+            page_provider=page_adapter,
         )
 
-    if active_settings.search_provider == "serpapi" and active_settings.page_provider == "firecrawl":
+    if active_settings.search_provider == "serpapi":
         from radar.scraping.adapters import ConfiguredSerpApiSearchAdapter
 
         return SearchBackedCollector(
             search_provider=ConfiguredSerpApiSearchAdapter(settings=active_settings),
-            page_provider=FirecrawlPageAdapter(settings=active_settings),
+            page_provider=page_adapter,
         )
 
     raise ProviderSelectionError(
         "Unsupported provider combination: "
         f"search_provider={active_settings.search_provider}, "
         f"page_provider={active_settings.page_provider}. "
-        "Use fixture/fixture for offline tests or firecrawl/firecrawl for external collection."
+        "Use fixture/fixture for offline tests or firecrawl/playwright for external collection."
+    )
+
+
+def _build_page_adapter(settings: RadarSettings):
+    if settings.page_provider == "firecrawl":
+        return FirecrawlPageAdapter(settings=settings)
+    if settings.page_provider == "playwright":
+        return PlaywrightPageAdapter(settings=settings)
+    raise ProviderSelectionError(
+        f"Unsupported page provider: {settings.page_provider}. "
+        "Use firecrawl or playwright for external page collection, or fixture/fixture for offline."
     )
 
 
