@@ -6,6 +6,10 @@ Antes de executar qualquer tarefa, leia:
 
 InteliAcademy-ProjetoNvidia\ai-agent-system\docs\Projeto_ NVIDIA Startup AI Radar (1).md
 
+Tambem leia o quadro de colaboracao entre agentes:
+
+`ai-agent-system\docs\agent-collaboration-board.md`
+
 Este documento contém:
 
 - Objetivos do projeto
@@ -18,6 +22,41 @@ Este documento contém:
 - Regras de negócio
 
 Considere esse documento a fonte principal de verdade do projeto.
+
+## Skills do Projeto
+
+Este projeto possui skills locais em:
+
+`ai-agent-system\skills\`
+
+**Todo agente deve consultar as skills relevantes antes de iniciar qualquer tarefa.**
+
+### Indice de skills
+
+`ai-agent-system\skills\SKILLS_INDEX.md`
+
+Consulte este indice para descobrir qual skill se aplica a tarefa atual.
+
+### Regra obrigatoria
+
+1. Antes de implementar qualquer coisa, verifique se existe uma skill relevante em `ai-agent-system/skills/`.
+2. Leia a SKILL.md da skill antes de comecar a trabalhar.
+3. Se estiver fazendo algo que pode virar um processo repetitivo, crie ou atualize uma skill.
+
+### Skills instaladas
+
+| Skill | Quando usar |
+|---|---|
+| `langgraph-nvidia-startup-radar` | Antes de mexer em estado, nodes, edges, pipeline, recomendacoes, validacao ou testes do grafo LangGraph. |
+| `multi-agent-orchestration` | Para pensar delegacao, paralelismo, consenso e agregacao entre os 8 agentes do Radar. |
+| `agent-architecture-audit` | Antes de release ou mudanca grande na arquitetura do agente. |
+| `obsidian-learning-notes` | Sempre que documentar progresso, explicar codigo, desenhar fluxos ou atualizar o handoff. |
+| `windows-powershell-repo-hygiene` | Ao lidar com edicoes PowerShell, encoding, venv validation ou git no Windows. |
+| `frontend-design` | Apenas quando iniciar o dashboard/interface frontend. |
+| `mcp-builder` | Quando for criar MCPs reais para expor ferramentas externas. |
+| `skill-creator` | Para formalizar um workflow repetitivo como skill nova. |
+| `find-skills` | Para descobrir skills existentes no ecossistema para um dominio, ferramenta ou workflow. |
+| `skill-installer` | Para instalar skills de repositorios locais ou GitHub no projeto. |
 
 ## Estado Operacional Atual
 
@@ -38,13 +77,7 @@ Use sempre o Python do venv do projeto:
 `InteliAcademy-ProjetoNvidia\venv\Scripts\python.exe`
 
 
-Ao lidar com falhas do sandbox Windows, edicoes via PowerShell, encoding, validacao com venv ou higiene de git, use a skill local:
-
-`ai-agent-system\skills\windows-powershell-repo-hygiene`
-
-Ao documentar aprendizado, explicacoes de codigo, fluxos do LangGraph ou atualizacoes do handoff, use a skill local:
-
-`ai-agent-system\skills\obsidian-learning-notes`
+As skills do projeto estao listadas na secao "Skills do Projeto" acima. Consulte-as antes de trabalhar.
 
 Nao usar APIs externas sem autorizacao explicita do usuario. Nao commitar segredos, `.env`, caches ou o `venv`.
 
@@ -88,6 +121,9 @@ Ao implementar funcionalidades:
 3. Não invente tecnologias NVIDIA.
 4. Priorize modularidade e rastreabilidade.
 5. Cite fontes sempre que possível.
+6. Antes de implementar qualquer coisa, verifique se existe uma skill relevante em `ai-agent-system/skills/`.
+7. Leia a SKILL.md da skill antes de comecar a trabalhar.
+8. Se estiver fazendo algo que pode virar um processo repetitivo, crie ou atualize uma skill.
 
 ## Missão do Projeto
 

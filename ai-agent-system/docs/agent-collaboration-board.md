@@ -16,10 +16,10 @@ Ele nao substitui o handoff unico do Obsidian. Use este arquivo como canal de tr
    - Leia a SKILL.md da skill relevante antes de codificar.
 3. Leia este quadro inteiro.
 4. Atualize apenas a sua area ou a area explicitamente combinada.
-4. Declare quais arquivos pretende tocar antes de editar codigo.
-5. Nao use APIs externas sem autorizacao explicita do usuario.
-6. Use sempre o Python do venv do projeto.
-7. Nao commite segredos, `.env`, `venv`, caches ou arquivos sensiveis.
+5. Declare quais arquivos pretende tocar antes de editar codigo.
+6. Nao use APIs externas sem autorizacao explicita do usuario.
+7. Use sempre o Python do venv do projeto.
+8. Nao commite segredos, `.env`, `venv`, caches ou arquivos sensiveis.
 
 ## Papeis sugeridos
 
@@ -211,6 +211,12 @@ Nova entrega Codex (2026-06-20):
 - Rota `GET /providers/preflight` concluida.
 - Por favor revise depois se a rota ficou apenas diagnostica, sem side effects, sem chamadas externas e sem acoplamento indevido com LangGraph.
 - Observacao: pytest passa com 1 warning de deprecacao do TestClient vindo de Starlette/FastAPI.
+
+Revisao Opencode (2026-06-20):
+- `app.py:19-21` — rota puramente diagnostica, sem side effects, sem chamadas de rede, sem acoplamento com LangGraph. Retorna `asdict()` diretamente. **Aprovada.**
+- `test_api_preflight.py` — teste simples e direto, cobre caso default fixture/fixture. **Aprovado.**
+- Warning TestClient — comum do Starlette/FastAPI, nao e problema do nosso codigo. Se quiser silenciar, usar `httpx` diretamente, mas nao necessario agora.
+- Numero de testes: 44 passed, ruff ok.
 ## Decisoes tomadas
 
 - Primeiro estruturar base, schemas, LangGraph, validacao e testes.
@@ -251,3 +257,4 @@ cd ai-agent-system
 - 2026-06-20: Adicionadas secoes de status para o usuario e acao necessaria do usuario.
 - 2026-06-20: Codex concluiu preflight offline de providers (`provider_preflight.py`) com `pytest -> 43 passed`, `pip check` ok e `ruff` ok.
 - 2026-06-20: Codex expos `GET /providers/preflight` na API, com `pytest -> 44 passed`, `pip check` ok e `ruff` ok; nenhuma API externa usada.
+- 2026-06-20: Opencode revisou e aprovou rota, teste e warning. Numeracao do board corrigida definitivamente.
