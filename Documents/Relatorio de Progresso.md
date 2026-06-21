@@ -620,10 +620,101 @@ Total: 68 tests passing, ruff clean
 ### Próximos passos
 
 ```text
-Fase 1: Scraping real (FINALIZADA — Firecrawl operacional)
-Fase 2: Instalar Playwright + trafilatura para complementar Firecrawl free tier
-Fase 3: LLM no Extractor e Classifier
-Fase 4: RAG NVIDIA real (Qdrant in-memory + sentence-transformers)
-Fase 5: Persistência (SQLite) e frontend
+Fase 1: Scraping real (FINALIZADA — Firecrawl + Playwright)
+Fase 2: LLM no Extractor e Classifier (FINALIZADA — Groq/OpenAI/Gemini)
+Fase 3: RAG NVIDIA real (Qdrant in-memory + sentence-transformers) ← PROXIMO
+Fase 4: Persistência (SQLite) e frontend
 ```
 
+---
+
+## 2026-06-20 (continuacao) — PlaywrightPageAdapter
+
+### O que foi feito
+
+- `settings.py`: adicionado `"playwright"` ao `PageProviderName`
+- `adapters.py`: criado `PlaywrightPageAdapter` — usa Chromium headless + trafilatura para extrair texto de paginas com JS pesado
+- `provider_factory.py`: suporta combos `firecrawl/playwright` e `serpapi/playwright`
+- `provider_preflight.py`: detecta se Chromium esta instalado
+- `test_playwright_adapter.py`: 9 testes (unitario, factory, preflight)
+- Handoff atualizado com plano claro de proximos passos em tabelas
+
+### Commits
+
+```text
+a1916a1 feat: PlaywrightPageAdapter as fallback page provider
+b96eba4 docs: firecrawl skill, README setup, relatorio, handoff, board update
+```
+
+### Validacao
+
+```text
+pytest -> 77 passed (era 68)
+ruff -> All checks passed
+```
+
+---
+
+## 2026-06-20 (continuacao) — LLM no Extractor e Classifier
+
+### O que foi feito
+
+#### src/radar/llm/ (novo modulo)
+
+- `adapters.py`: tres providers com fallback chain:
+  - `GroqProvider` (Llama 3.3 70B — primario)
+  - `OpenAIProvider` (GPT-4o-mini — primeiro fallback)
+  - `GeminiProvider` (Gemini 2.0 Flash — segundo fallback)
+- `prompts.py`: `EXTRACTION_PROMPT` + `CLASSIFICATION_PROMPT` com saida JSON estruturada
+- `run_llm_with_fallback()`: tenta provedores em ordem, propaga erro se todos falharem
+- Safety switch: se `RADAR_ENABLE_EXTERNAL_PROVIDERS=false`, levanta `ExternalProviderDisabledError`
+
+#### Extractor (src/radar/agents/extractor.py)
+
+- `_build_profile()` agora tenta `_llm_extract()` primeiro se providers habilitados
+- Se LLM falhar, cai no `_deterministic_extract()` (regex/scoring original)
+- `_llm_extract()`: chama `run_llm_with_fallback()` com `EXTRACTION_PROMPT`, faz parse do JSON retornado
+- `_parse_llm_json()`: trata markdown ```json ``` e JSON puro
+
+#### Classifier (src/radar/agents/classifier.py)
+
+- `classify_startup()` agora tenta `_llm_classify()` primeiro se providers habilitados
+- Se LLM falhar, cai no `_deterministic_classify()` (scoring multidimensional)
+- `_llm_classify()`: monta profile + textos das fontes, chama `run_llm_with_fallback()` com `CLASSIFICATION_PROMPT`
+- Adiciona caveats automaticos se tecnologias NVIDIA detectadas
+
+#### settings.py
+
+- `LLMProviderName = Literal["groq", "openai", "gemini"]`
+- `llm_provider: LLMProviderName = "groq"`
+- `llm_fallbacks: list[LLMProviderName] = ["openai", "gemini"]`
+- `groq_api_key`, `openai_api_key`, `gemini_api_key`
+
+#### Provider Preflight
+
+- `ProviderPreflight` agora inclui `llm_provider`, `llm_fallbacks`, `llm_ready`
+- `_check_llm_ready()`: retorna True se pelo menos 1 API key estiver configurada
+
+#### .env (gitignorado)
+
+Configurado com as 3 chaves fornecidas pelo usuario.
+
+### Commits
+
+```text
+48c601d feat: LLM adapter with Groq primary + OpenAI/Gemini fallback chain
+```
+
+### Testes
+
+```text
+tests/test_llm_adapters.py: 15 tests
+  - safety switch (3): disabled error, fallback disabled, missing key
+  - factories (4): Groq/OpenAI/Gemini instantiation, unknown provider
+  - prompts (2): extraction fields, classification labels
+  - preflight (5): no keys, groq key, openai key, full preflight, preflight no keys
+  - fallback chain (1): all providers fail → RuntimeError
+
+Total: 92 tests passing (era 77)
+ruff -> All checks passed
+```
