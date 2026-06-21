@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Dict, Pattern
 
 from radar.graph.state import RadarState
+from radar.llm import EXTRACTION_PROMPT, run_llm_with_fallback
 from radar.schemas import EvidenceClaim, SourceDocument, StartupProfile
+from radar.settings import get_settings
 
 
 SECTOR_PATTERNS: list[tuple[Pattern[str], str]] = [
@@ -58,6 +61,9 @@ TECHNOLOGY_KEYWORDS: list[tuple[Pattern[str], str]] = [
     (re.compile(r"gpu|inferencia|inference\s+(?:serv|optim)", re.IGNORECASE), "GPU Inference"),
 ]
 
+AI_MARKERS = ("ai", "ia", "llm", "machine learning", "agents", "automation")
+TECH_MARKERS = ("pipeline", "production", "evaluation", "workflow", "data")
+
 
 def extract_startups_and_claims(state: RadarState) -> tuple[list[StartupProfile], list[EvidenceClaim]]:
     sources = state.get("sources", [])
@@ -67,7 +73,6 @@ def extract_startups_and_claims(state: RadarState) -> tuple[list[StartupProfile]
     for source in sources:
         if not source.text:
             continue
-
         claim_type = _infer_claim_type(source.text)
         confidence = _infer_claim_confidence(source.source_type, claim_type)
         claims.append(
@@ -88,6 +93,53 @@ def _build_profile(
 ) -> StartupProfile:
     all_text = " ".join(s.text for s in sources if s.text)
 
+    settings = get_settings()
+    if settings.enable_external_providers:
+        try:
+            return _llm_extract(query, sources, claims)
+        except Exception:
+            pass
+
+    return _deterministic_extract(query, all_text, sources, claims)
+
+
+def _llm_extract(
+    query: str, sources: list[SourceDocument], claims: list[EvidenceClaim]
+) -> StartupProfile:
+    combined_text = "\n\n---\n\n".join(
+        f"[{s.source_type}] {s.title}\n{s.text[:2000]}"
+        for s in sources if s.text
+    )
+
+    result = run_llm_with_fallback(
+        system_prompt=EXTRACTION_PROMPT,
+        user_prompt=f"Startup: {query}\n\nCollected text:\n{combined_text[:8000]}",
+    )
+
+    parsed = _parse_llm_json(result)
+    if parsed is None:
+        raise ValueError("LLM returned invalid JSON for extraction")
+
+    technologies = parsed.get("technologies") or []
+    ai_claims = [c for c in claims if c.claim_type == "ai_usage"]
+    usage_summary = parsed.get("ai_usage_summary") or _summarize_ai_usage(ai_claims, technologies, parsed.get("sector"))
+
+    return StartupProfile(
+        name=query,
+        sector=parsed.get("sector"),
+        product=parsed.get("product"),
+        description="Startup profile assembled from collected public evidence via LLM.",
+        founders=parsed.get("founders") or [],
+        funding=parsed.get("funding"),
+        cited_technologies=technologies,
+        ai_usage_summary=usage_summary,
+        evidence_ids=[c.id for c in claims],
+    )
+
+
+def _deterministic_extract(
+    query: str, all_text: str, sources: list[SourceDocument], claims: list[EvidenceClaim]
+) -> StartupProfile:
     sector = _extract_sector(all_text)
     product = _extract_product(all_text)
     founders = _extract_founders(all_text)
@@ -108,6 +160,18 @@ def _build_profile(
         ai_usage_summary=usage_summary,
         evidence_ids=[c.id for c in claims],
     )
+
+
+def _parse_llm_json(text: str) -> dict | None:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[-1]
+        text = text.rsplit("```", 1)[0]
+        text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
 
 
 def _extract_sector(text: str) -> str | None:
@@ -147,10 +211,6 @@ def _extract_technologies(text: str) -> list[str]:
     return found
 
 
-AI_MARKERS = ("ai", "ia", "llm", "machine learning", "agents", "automation")
-TECH_MARKERS = ("pipeline", "production", "evaluation", "workflow", "data")
-
-
 def _infer_claim_type(text: str) -> str:
     normalized_text = text.lower()
     if any(marker in normalized_text for marker in AI_MARKERS):
@@ -185,10 +245,8 @@ def _summarize_ai_usage(
 ) -> str | None:
     if not ai_claims:
         return None
-
     tech_count = len(technologies)
     sector_info = f" no setor de {sector}" if sector else ""
-
     if tech_count >= 3:
         return (
             f"Evidencias indicam uso intensivo de IA{sector_info}, com "
@@ -200,6 +258,6 @@ def _summarize_ai_usage(
             f"{tech_count} tecnologia(s) especifica(s) identificada(s)."
         )
     return (
-        "Public evidence mentions AI usage{sector_info}; "
+        "Public evidence mentions AI usage; "
         "deeper AI-native dependency still requires validation."
     )

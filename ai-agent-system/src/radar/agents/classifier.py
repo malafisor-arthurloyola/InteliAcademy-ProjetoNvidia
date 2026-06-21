@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import json
+
 from radar.graph.state import RadarState
+from radar.llm import CLASSIFICATION_PROMPT, run_llm_with_fallback
 from radar.schemas import StartupClassification
+from radar.settings import get_settings
+
 
 AI_NATIVE_KEYWORDS = (
     "proprietário", "proprietario", "proprietary",
@@ -40,6 +45,71 @@ def classify_startup(state: RadarState) -> StartupClassification:
     sources = state.get("sources", [])
     profiles = state.get("extracted_startups", [])
 
+    settings = get_settings()
+    if settings.enable_external_providers:
+        try:
+            return _llm_classify(state)
+        except Exception:
+            pass
+
+    return _deterministic_classify(claims, sources, profiles)
+
+
+def _llm_classify(state: RadarState) -> StartupClassification:
+    sources = state.get("sources", [])
+    profiles = state.get("extracted_startups", [])
+
+    combined_text = "\n\n---\n\n".join(
+        f"[{s.source_type}] {s.title}\n{s.text[:1500]}"
+        for s in sources if s.text
+    )
+
+    profile = profiles[0] if profiles else None
+    profile_summary = ""
+    if profile:
+        profile_summary = (
+            f"Sector: {profile.sector}\n"
+            f"Product: {profile.product}\n"
+            f"Technologies: {', '.join(profile.cited_technologies) if profile.cited_technologies else 'none'}\n"
+            f"Funding: {profile.funding or 'none'}\n"
+            f"Founders: {', '.join(profile.founders) if profile.founders else 'none'}\n"
+            f"AI Summary: {profile.ai_usage_summary or 'none'}"
+        )
+
+    user_input = f"Startup Profile:\n{profile_summary}\n\nCollected text:\n{combined_text[:8000]}"
+
+    result = run_llm_with_fallback(
+        system_prompt=CLASSIFICATION_PROMPT,
+        user_prompt=user_input,
+    )
+
+    parsed = _parse_llm_json(result)
+    if parsed is None:
+        raise ValueError("LLM returned invalid JSON for classification")
+
+    label = parsed.get("label", "Non-AI")
+    confidence = min(float(parsed.get("confidence", 0.5)), 1.0)
+    rationale = parsed.get("rationale", "")
+    caveats = parsed.get("caveats") or []
+
+    ai_claims = [c for c in state.get("claims", []) if c.claim_type == "ai_usage"]
+    if profile and profile.cited_technologies:
+        has_nvidia = any(t in NVIDIA_TECHS for t in profile.cited_technologies)
+        if has_nvidia:
+            nvidia_caveat = "Startup ja cita tecnologias NVIDIA: validar se ja esta no NVIDIA Inception."
+            if nvidia_caveat not in caveats:
+                caveats.append(nvidia_caveat)
+
+    return StartupClassification(
+        label=label,
+        confidence=confidence,
+        rationale=rationale,
+        supporting_evidence_ids=[c.id for c in ai_claims],
+        caveats=caveats,
+    )
+
+
+def _deterministic_classify(claims, sources, profiles) -> StartupClassification:
     all_text = " ".join(s.text for s in sources if s.text) if sources else ""
     ai_claims = [c for c in claims if c.claim_type == "ai_usage"]
     tech_claims = [c for c in claims if c.claim_type == "technology_signal"]
@@ -98,6 +168,18 @@ def classify_startup(state: RadarState) -> StartupClassification:
     )
 
 
+def _parse_llm_json(text: str) -> dict | None:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[-1]
+        text = text.rsplit("```", 1)[0]
+        text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+
 def _score_ai_native(text: str, technologies: list[str]) -> float:
     score = 0.0
     for keyword in AI_NATIVE_KEYWORDS:
@@ -108,17 +190,14 @@ def _score_ai_native(text: str, technologies: list[str]) -> float:
         else:
             if keyword.replace(".", "") in text.lower():
                 score += 0.4
-
     has_nvidia_techs = sum(1 for t in technologies if t in NVIDIA_TECHS)
     score += has_nvidia_techs * 0.5
-
     if "agent" in text.lower() and "multi" in text.lower():
         score += 0.5
     if "fine.uning" in text.lower() or "custom model" in text.lower():
         score += 0.5
     if "proprietary" in text.lower() or "proprietário" in text.lower():
         score += 0.4
-
     return min(score, 4.0)
 
 
@@ -132,29 +211,21 @@ def _score_ai_enabled(text: str, technologies: list[str]) -> float:
         else:
             if keyword.replace(".", "") in text.lower():
                 score += 0.25
-
     has_generic_techs = sum(1 for t in technologies if t not in NVIDIA_TECHS)
     score += has_generic_techs * 0.2
-
     return min(score, 3.0)
 
 
-def _evidence_quality_score(
-    ai_claims: list, tech_claims: list, sources: list
-) -> float:
+def _evidence_quality_score(ai_claims, tech_claims, sources) -> float:
     score = 0.0
     score += min(len(ai_claims) * 0.3, 1.5)
     score += min(len(tech_claims) * 0.2, 0.6)
-
     unique_types = {s.source_type for s in sources}
     score += min(len(unique_types) * 0.15, 0.6)
-
     return min(score, 2.0)
 
 
-def _business_maturity_score(
-    has_funding: bool, has_founders: bool, sector: str | None
-) -> float:
+def _business_maturity_score(has_funding: bool, has_founders: bool, sector: str | None) -> float:
     score = 0.0
     if has_funding:
         score += 0.4

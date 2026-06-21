@@ -10,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ProviderMode = Literal["fixture", "external"]
 SearchProviderName = Literal["fixture", "serpapi", "firecrawl"]
 PageProviderName = Literal["fixture", "firecrawl", "playwright"]
+LLMProviderName = Literal["groq", "openai", "gemini"]
 
 
 class RadarSettings(BaseSettings):
@@ -28,8 +29,14 @@ class RadarSettings(BaseSettings):
     page_provider: PageProviderName = "fixture"
     provider_timeout_seconds: int = Field(default=10, ge=1, le=120)
 
+    llm_provider: LLMProviderName = "groq"
+    llm_fallbacks: list[LLMProviderName] = Field(default_factory=lambda: ["openai", "gemini"])
+
     serpapi_api_key: str | None = Field(default=None, validation_alias="SERPAPI_API_KEY")
     firecrawl_api_key: str | None = Field(default=None, validation_alias="FIRECRAWL_API_KEY")
+    groq_api_key: str | None = Field(default=None, validation_alias="GROQ_API_KEY")
+    openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    gemini_api_key: str | None = Field(default=None, validation_alias="GEMINI_API_KEY")
 
     @property
     def provider_mode(self) -> ProviderMode:

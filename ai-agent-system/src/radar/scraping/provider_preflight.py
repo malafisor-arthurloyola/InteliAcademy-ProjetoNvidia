@@ -19,6 +19,9 @@ class ProviderPreflight:
     external_providers_enabled: bool
     network_required: bool
     missing_credentials: tuple[str, ...] = ()
+    llm_provider: str = "groq"
+    llm_fallbacks: tuple[str, ...] = ()
+    llm_ready: bool = False
     messages: tuple[str, ...] = ()
 
     @property
@@ -44,6 +47,9 @@ def inspect_provider_setup(settings: RadarSettings | None = None) -> ProviderPre
             page_provider=page_provider,
             external_providers_enabled=active_settings.enable_external_providers,
             network_required=False,
+            llm_provider=active_settings.llm_provider,
+            llm_fallbacks=tuple(active_settings.llm_fallbacks),
+            llm_ready=_check_llm_ready(active_settings),
             messages=("Using deterministic fixture providers; no external API calls are required.",),
         )
 
@@ -56,6 +62,9 @@ def inspect_provider_setup(settings: RadarSettings | None = None) -> ProviderPre
         page_provider=page_provider,
         external_providers_enabled=active_settings.enable_external_providers,
         network_required=search_provider != "fixture" or page_provider != "fixture",
+        llm_provider=active_settings.llm_provider,
+        llm_fallbacks=tuple(active_settings.llm_fallbacks),
+        llm_ready=_check_llm_ready(active_settings),
         messages=(
             "Unsupported provider combination. Use fixture/fixture for offline tests "
             "or firecrawl/playwright for the controlled external stack.",
@@ -73,6 +82,9 @@ def _inspect_external_stack(settings: RadarSettings) -> ProviderPreflight:
             external_providers_enabled=False,
             network_required=True,
             missing_credentials=missing_credentials,
+            llm_provider=settings.llm_provider,
+            llm_fallbacks=tuple(settings.llm_fallbacks),
+            llm_ready=_check_llm_ready(settings),
             messages=(
                 "External scraping providers are selected but blocked by "
                 "RADAR_ENABLE_EXTERNAL_PROVIDERS=false.",
@@ -88,6 +100,9 @@ def _inspect_external_stack(settings: RadarSettings) -> ProviderPreflight:
             external_providers_enabled=True,
             network_required=True,
             missing_credentials=missing_credentials,
+            llm_provider=settings.llm_provider,
+            llm_fallbacks=tuple(settings.llm_fallbacks),
+            llm_ready=_check_llm_ready(settings),
             messages=("External providers are enabled but required API keys are missing.",),
         )
 
@@ -97,6 +112,10 @@ def _inspect_external_stack(settings: RadarSettings) -> ProviderPreflight:
         page_provider=settings.page_provider,
         external_providers_enabled=True,
         network_required=True,
+        missing_credentials=missing_credentials,
+        llm_provider=settings.llm_provider,
+        llm_fallbacks=tuple(settings.llm_fallbacks),
+        llm_ready=_check_llm_ready(settings),
         messages=(
             "External provider configuration is complete. Running collection would use network/API calls.",
         ),
@@ -123,3 +142,16 @@ def _has_playwright_browser() -> bool:
             return True
     except Exception:
         return False
+
+
+def _check_llm_ready(settings: RadarSettings) -> bool:
+    """Check if at least one LLM provider has its API key configured."""
+    checks = []
+    if settings.groq_api_key:
+        checks.append("groq")
+    if settings.openai_api_key:
+        checks.append("openai")
+    if settings.gemini_api_key:
+        checks.append("gemini")
+    return bool(checks)
+
