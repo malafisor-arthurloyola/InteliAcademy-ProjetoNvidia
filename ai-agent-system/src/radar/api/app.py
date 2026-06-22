@@ -18,6 +18,7 @@ from radar.database import (
     get_run_evidence_claims,
     get_run_recommendations,
     get_run_source_documents,
+    get_runs_by_startup,
     get_startup_by_id,
     init_db,
     save_evidence_claim,
@@ -26,6 +27,7 @@ from radar.database import (
     save_source_document,
     save_startup,
     save_validation,
+    update_run_startup,
     update_run_status,
 )
 from radar.graph.builder import build_graph
@@ -73,7 +75,8 @@ def _persist_run_result(run_id: int, result: dict[str, Any]) -> None:  # noqa: C
             if classification_data
             else None,
         }
-        save_startup(startup_dict)
+        startup_id = save_startup(startup_dict)
+        update_run_startup(run_id, startup_id)
         update_run_status(run_id, "completed")
 
         for src in result.get("sources", []):
@@ -176,3 +179,10 @@ def get_startup(startup_id: str) -> dict[str, Any]:
     if not startup:
         raise HTTPException(status_code=404, detail="Startup not found")
     return startup
+
+
+@app.get("/startups/{startup_id}/runs")
+def list_startup_runs(startup_id: str) -> list[dict[str, Any]]:
+    if not get_startup_by_id(startup_id):
+        raise HTTPException(status_code=404, detail="Startup not found")
+    return get_runs_by_startup(startup_id)

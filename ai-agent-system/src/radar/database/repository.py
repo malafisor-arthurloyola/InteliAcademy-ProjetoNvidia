@@ -102,6 +102,23 @@ def update_run_status(run_id: int, status: str) -> None:
         )
 
 
+def update_run_startup(run_id: int, startup_id: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE runs SET startup_id = ? WHERE id = ?",
+            (startup_id, run_id),
+        )
+
+
+def get_runs_by_startup(startup_id: str) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, query, startup_id, status, created_at, completed_at FROM runs WHERE startup_id = ? ORDER BY created_at DESC",
+            (startup_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 def save_startup(data: dict[str, Any]) -> str:
     with get_connection() as conn:
         existing = conn.execute(
@@ -320,10 +337,42 @@ def get_run_recommendations(run_id: int) -> list[dict[str, Any]]:
         return [dict(r) for r in rows]
 
 
+_STARTUP_SELECT = """
+    SELECT s.*,
+      ROUND(
+        (COALESCE(s.classification_confidence, 0) * 0.4 +
+         MIN(COALESCE((
+           SELECT COUNT(*) FROM evidence_claims ec
+           JOIN source_documents sd ON sd.id = ec.source_document_id
+           JOIN runs r ON r.id = sd.run_id
+           WHERE r.startup_id = s.id
+         ), 0) / 5.0, 1.0) * 0.3 +
+         MIN(COALESCE((
+           SELECT COUNT(*) FROM recommendations rec
+           JOIN runs r ON r.id = rec.run_id
+           WHERE r.startup_id = s.id
+         ), 0) / 3.0, 1.0) * 0.3
+        ) * 100, 0
+      ) AS radar_score,
+      COALESCE((
+        SELECT COUNT(*) FROM evidence_claims ec
+        JOIN source_documents sd ON sd.id = ec.source_document_id
+        JOIN runs r ON r.id = sd.run_id
+        WHERE r.startup_id = s.id
+      ), 0) AS evidence_count,
+      COALESCE((
+        SELECT COUNT(*) FROM recommendations rec
+        JOIN runs r ON r.id = rec.run_id
+        WHERE r.startup_id = s.id
+      ), 0) AS recommendation_count
+    FROM startups s
+"""
+
+
 def get_all_startups() -> list[dict[str, Any]]:
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT * FROM startups ORDER BY updated_at DESC"
+            _STARTUP_SELECT + "ORDER BY radar_score DESC, s.updated_at DESC"
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -331,6 +380,6 @@ def get_all_startups() -> list[dict[str, Any]]:
 def get_startup_by_id(startup_id: str) -> dict[str, Any] | None:
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT * FROM startups WHERE id = ?", (startup_id,)
+            _STARTUP_SELECT + "WHERE s.id = ?", (startup_id,)
         ).fetchone()
         return dict(row) if row else None
