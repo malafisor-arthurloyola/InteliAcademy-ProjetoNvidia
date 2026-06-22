@@ -1262,3 +1262,51 @@ Observacao: o Vite dev server ja estava rodando em `127.0.0.1:5173`; o backend F
 - `Profile` continua mock, conforme combinado.
 - `Overview` e `Ranking` ficam para a branch `feat/backend-scores`/Opencode.
 - Quando o backend persistir `startup_id` no run, a associacao temporaria por nome/query podera ser removida ou mantida apenas como fallback.
+
+---
+
+## 2026-06-22 (Merge das branches + Fase 4b concluida)
+
+### Resumo executivo
+
+As branches `feat/backend-scores` (backend) e `feat/frontend-pages` (frontend) foram mergedadas em `main` com zero conflito de arquivos. A Fase 4b (frontend dashboard completo com API real) esta concluida. Todas as 7 paginas consomem dados reais da FastAPI.
+
+### O que mudou
+
+- Merge `feat/backend-scores` (fast-forward): `repository.py`, `app.py`, `index.tsx`, `ranking.tsx` — scores computados no SQL, Overview e Ranking com API real.
+- Merge `feat/frontend-pages` (merge ort): `startup.$id.tsx`, `briefing.tsx`, `contacts.tsx`, `api-derived.ts` (novo) — paginas conectadas a API real com fallback por nome/query.
+- Nenhum conflito de merge. Nenhum arquivo tocado por ambas as branches.
+
+### Validacoes
+
+```text
+pytest -> 129 passed, 1 flaky pre-existente (NeMo Guardrails)
+git push -> 8f5cd4b -> main
+```
+
+### Estado atual do frontend
+
+| Pagina | Fonte de dados | Status |
+|---|---|---|
+| `/` (Overview) | API real | ✅ |
+| `/pipeline` | API real | ✅ |
+| `/sources` | API real | ✅ |
+| `/ranking` | API real | ✅ |
+| `/startup/$id` | API real | ✅ |
+| `/briefing` | API real | ✅ |
+| `/contacts` | API real | ✅ |
+| `/profile` | Mock | ⏳ |
+
+### Proximos passos
+
+```text
+Fase 5: Persistencia SQLite completa + deploy
+  - SQLite com migracoes controladas (Alembic?)
+  - Healthcheck de infraestrutura
+  - Script de deploy local (start.ps1)
+  - Documentacao de setup end-to-end
+Fase 6: Feature faltantes
+  - Profile page com dados reais
+  - Filtros avancados no ranking
+  - Exportacao de relatorios
+```

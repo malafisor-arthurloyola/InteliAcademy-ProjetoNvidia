@@ -71,16 +71,20 @@ O projeto ja possui:
 - erros estruturados de coleta;
 - caveats no briefing;
 - safety switch para providers externos;
-- testes automatizados.
+- testes automatizados;
+- FastAPI CRUD com SQLite + Qdrant;
+- RAG enricher com trafilatura;
+- Frontend React (Toph) com 7 paginas API-driven;
+- Providers externos autorizados: Firecrawl, Groq, OpenAI, Gemini.
 
-Proxima fase provavel:
+Fase concluida:
 
 ```text
-scraping real controlado
- -> LLM no Extractor/Classifier
- -> RAG NVIDIA real
- -> persistencia
- -> frontend
+Fase 1: Estrutura base, schemas, LangGraph, validacao, testes.        ✅
+Fase 2: Scraping real (Firecrawl, Playwright/trafilatura).             ✅
+Fase 3: LLM no Extractor/Classifier (Groq + fallback Gemini/OpenAI).   ✅
+Fase 4a: RAG NVIDIA (Qdrant + sentence-transformers).                  ✅
+Fase 4b: Frontend dashboard completo com API real.                     ✅
 ```
 
 
@@ -89,13 +93,16 @@ scraping real controlado
 Resumo atual:
 
 ```text
-Codex concluiu provider config fix: backend carrega .env da raiz e do ai-agent-system via get_settings(), sem expor segredos. Proximo foco: recomendacoes vazias no fluxo real.
+Branches feat/backend-scores e feat/frontend-pages mergedados em main com zero conflito.
+Todas as 7 paginas do frontend consumindo API real.
+Profile permanece mock (baixa prioridade).
+Proximo foco: Fase 5 — persistencia SQLite completa + deploy.
 ```
 
 Ultima atualizacao:
 
 ```text
-2026-06-21
+2026-06-22
 ```
 Proxima verificacao sugerida:
 
