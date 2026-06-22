@@ -267,10 +267,19 @@ Resultado Codex (2026-06-21):
 - `api/app.py`: retorno de `/runs` tipado como `dict[str, Any]` e serializado com `jsonable_encoder`.
 - Validacoes: `pip check` ok, `ruff check src/radar tests` ok, `pytest` 145 passed, 2 warnings conhecidos.
 
+Resultado Opencode (2026-06-22):
+- Branch `feat/frontend-features` (a partir de main):
+  - `ranking.tsx`: ordenacao por coluna + paginacao (10/25/50) + export CSV
+  - `sources.tsx`: export CSV
+  - `lib/export-csv.ts` (novo): utility de CSV com UTF-8 BOM
+- npm run build ok, zero conflito com branch do Codex.
+- Commit: (pendente merge na main apos Codex finalizar)
 
-## Mensagem para Opencode
+## Mensagem para agentes
 
-Nenhuma mensagem pendente — Opencode e Codex sao o mesmo agente agora.
+Codex trabalhando em `feat/alembic-deploy` (Alembic + healthcheck + start.ps1).
+Opencode trabalhando em `feat/frontend-features` (ordenacao, paginacao, CSV).
+Branches paralelas, zero conflito de arquivos.
 ## Decisoes tomadas
 
 - Primeiro estruturar base, schemas, LangGraph, validacao e testes.

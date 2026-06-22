@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScoreBar } from "@/components/ui-bits";
@@ -8,8 +9,9 @@ import { useMemo, useState } from "react";
 import { useHealth } from "@/lib/hooks/use-health";
 import { useSources } from "@/lib/hooks/use-sources";
 import { ApiErrorDisplay } from "@/components/api-error-display";
+import { downloadCsv } from "@/lib/export-csv";
 import { cn } from "@/lib/utils";
-import { Database, Search } from "lucide-react";
+import { Database, Download, Search } from "lucide-react";
 import type { ApiError, SourceDocumentRecord } from "@/lib/api";
 
 export const Route = createFileRoute("/sources")({
@@ -99,6 +101,33 @@ function SourcesPage() {
     return { total: sources.length, withClaims, needsReview, totalClaims };
   }, [sources]);
 
+  function handleExportCsv() {
+    const headers = [
+      "Domínio",
+      "URL",
+      "Título",
+      "Tipo",
+      "Claims",
+      "Confiança Média",
+      "Coleta",
+      "Status",
+    ];
+    const rows = sources.map((s) => {
+      const status = sourceStatus(s);
+      return [
+        s.domain,
+        s.url,
+        s.title ?? "",
+        s.source_type,
+        s.claim_count,
+        confidenceScore(s),
+        formatDate(s.retrieved_at),
+        status,
+      ];
+    });
+    downloadCsv("fontes-evidencias", headers, rows);
+  }
+
   const error = healthError ?? sourcesError;
   if (error) {
     return (
@@ -168,14 +197,19 @@ function SourcesPage() {
       </div>
 
       <Card className="p-3">
-        <div className="relative max-w-md">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Filtrar fontes por domínio, URL ou tipo..."
-            className="h-9 pl-8"
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative max-w-md grow">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Filtrar fontes por domínio, URL ou tipo..."
+              className="h-9 pl-8"
+            />
+          </div>
+          <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={handleExportCsv}>
+            <Download className="h-3.5 w-3.5" /> CSV
+          </Button>
         </div>
       </Card>
 

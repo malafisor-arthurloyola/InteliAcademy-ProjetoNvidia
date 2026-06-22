@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,13 +7,22 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ScoreBar, MaturityBadge, CompanyLogo, ContactStatusBadge } from "@/components/ui-bits";
 import { useContacts } from "@/lib/contacts-store";
 import { useHealth } from "@/lib/hooks/use-health";
 import { useStartups } from "@/lib/hooks/use-startups";
 import { ApiErrorDisplay } from "@/components/api-error-display";
+import { downloadCsv } from "@/lib/export-csv";
+import { cn } from "@/lib/utils";
 import type { ApiError, StartupRecord } from "@/lib/api";
-import { ArrowRight, Filter } from "lucide-react";
+import { ArrowRight, Filter, Download, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 export const Route = createFileRoute("/ranking")({
   head: () => ({ meta: [{ title: "Ranking — NVIDIA Toph" }] }),
@@ -46,6 +55,39 @@ function scoreFromCount(count: number, max: number): number {
   return Math.round(Math.min(count / max, 1) * 100);
 }
 
+function ThSort({
+  field,
+  label,
+  sortField,
+  sortDir,
+  onToggle,
+}: {
+  field: SortField;
+  label: string;
+  sortField: SortField;
+  sortDir: SortDir;
+  onToggle: (f: SortField) => void;
+}) {
+  const isActive = sortField === field;
+  const Icon = isActive
+    ? sortDir === "asc" ? ArrowUp : ArrowDown
+    : ArrowUpDown;
+  return (
+    <th className="px-3 py-2 font-medium">
+      <button
+        className="inline-flex items-center gap-1 text-[11px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+        onClick={() => onToggle(field)}
+      >
+        {label}
+        <Icon className={cn("h-3 w-3", isActive ? "text-primary" : "opacity-40")} />
+      </button>
+    </th>
+  );
+}
+
+type SortField = "name" | "sector" | "classification_label" | "radar_score" | "evidence_count" | "recommendation_count";
+type SortDir = "asc" | "desc";
+
 function Ranking() {
   const contacts = useContacts();
   const { data: health, error: healthError, refetch: retryHealth } = useHealth();
@@ -53,6 +95,10 @@ function Ranking() {
   const [search, setSearch] = useState("");
   const [maturity, setMaturity] = useState<string[]>([]);
   const [sectors, setSectors] = useState<string[]>([]);
+  const [sortField, setSortField] = useState<SortField>("radar_score");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
 
   const records = startupRecords as StartupRecord[];
 
@@ -67,6 +113,66 @@ function Ranking() {
       return true;
     });
   }, [search, maturity, sectors, records]);
+
+  const sorted = useMemo(() => {
+    const collator = new Intl.Collator("pt-BR", { sensitivity: "base" });
+    return [...filtered].sort((a, b) => {
+      const av = (a as any)[sortField];
+      const bv = (b as any)[sortField];
+      let cmp: number;
+      if (typeof av === "number" && typeof bv === "number") {
+        cmp = av - bv;
+      } else {
+        cmp = collator.compare(String(av ?? ""), String(bv ?? ""));
+      }
+      return sortDir === "desc" ? -cmp : cmp;
+    });
+  }, [filtered, sortField, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const paginated = useMemo(() => {
+    const start = page * pageSize;
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, page, pageSize]);
+
+  const toggleSort = useCallback((field: SortField) => {
+    setSortField((prev) => {
+      if (prev === field) {
+        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+        return field;
+      }
+      setSortDir("desc");
+      return field;
+    });
+    setPage(0);
+  }, []);
+
+  function handleExportCsv() {
+    const headers = [
+      "Startup",
+      "Setor",
+      "Maturidade",
+      "Contato",
+      "Radar Score",
+      "Evidências",
+      "Recomendações",
+      "Funding",
+    ];
+    const rows = filtered.map((s) => {
+      const status = contacts[s.id]?.status ?? "Não contactada";
+      return [
+        s.name,
+        s.sector ?? "",
+        s.classification_label ?? "",
+        status,
+        (s as any).radar_score ?? 0,
+        (s as any).evidence_count ?? 0,
+        (s as any).recommendation_count ?? 0,
+        s.funding ?? "",
+      ];
+    });
+    downloadCsv("ranking-startups", headers, rows);
+  }
 
   const error = healthError ?? startupsError;
   if (error) {
@@ -121,15 +227,18 @@ function Ranking() {
       {/* Table */}
       <div className="min-w-0 space-y-3">
         <Card className="p-3">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <Input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
               placeholder="Filtrar por nome…"
               className="h-9 sm:max-w-xs"
             />
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Badge variant="outline" className="text-[11px]">{filtered.length} de {records.length}</Badge>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={handleExportCsv}>
+                <Download className="h-3.5 w-3.5" /> CSV
+              </Button>
             </div>
           </div>
         </Card>
@@ -139,18 +248,18 @@ function Ranking() {
             <table className="w-full min-w-[900px] border-collapse text-sm">
               <thead className="bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Startup</th>
-                  <th className="px-3 py-2 font-medium">Setor</th>
-                  <th className="px-3 py-2 font-medium">AI maturity</th>
+                  <ThSort field="name" label="Startup" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <ThSort field="sector" label="Setor" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <ThSort field="classification_label" label="AI maturity" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <th className="px-3 py-2 font-medium">Contato</th>
-                  <th className="px-3 py-2 font-medium">Radar</th>
-                  <th className="px-3 py-2 font-medium">Evidências</th>
-                  <th className="px-3 py-2 font-medium">Recomendações</th>
+                  <ThSort field="radar_score" label="Radar" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <ThSort field="evidence_count" label="Evidências" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
+                  <ThSort field="recommendation_count" label="Recomendações" sortField={sortField} sortDir={sortDir} onToggle={toggleSort} />
                   <th className="px-3 py-2"></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((s) => {
+                {paginated.map((s) => {
                   const status = contacts[s.id]?.status ?? "Não contactada";
                   const evidenceScore = scoreFromCount((s as any).evidence_count ?? 0, 5);
                   const recScore = scoreFromCount((s as any).recommendation_count ?? 0, 3);
@@ -181,13 +290,66 @@ function Ranking() {
                   </tr>
                   );
                 })}
-                {filtered.length === 0 && (
+                {paginated.length === 0 && (
                   <tr><td colSpan={8} className="px-3 py-10 text-center text-xs text-muted-foreground">Nenhuma startup com os filtros atuais.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </Card>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <Card className="flex flex-wrap items-center justify-between gap-3 p-3">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Linhas por página:</span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => { setPageSize(Number(v)); setPage(0); }}
+              >
+                <SelectTrigger className="h-7 w-16 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-1 text-xs">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2"
+                disabled={page === 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+              >
+                Anterior
+              </Button>
+              {Array.from({ length: totalPages }, (_, i) => (
+                <Button
+                  key={i}
+                  size="sm"
+                  variant={i === page ? "default" : "outline"}
+                  className="h-7 min-w-7 px-1 text-xs"
+                  onClick={() => setPage(i)}
+                >
+                  {i + 1}
+                </Button>
+              ))}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2"
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              >
+                Próximo
+              </Button>
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );

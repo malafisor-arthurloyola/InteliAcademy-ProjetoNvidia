@@ -1300,13 +1300,49 @@ git push -> 8f5cd4b -> main
 ### Proximos passos
 
 ```text
-Fase 5: Persistencia SQLite completa + deploy
-  - SQLite com migracoes controladas (Alembic?)
-  - Healthcheck de infraestrutura
+Fase 5: Persistencia SQLite completa + deploy (Codex)
+  - Alembic para migracoes versionadas
+  - Healthcheck de banco /health/db
   - Script de deploy local (start.ps1)
   - Documentacao de setup end-to-end
-Fase 6: Feature faltantes
-  - Profile page com dados reais
-  - Filtros avancados no ranking
-  - Exportacao de relatorios
+Fase 6: Feature faltantes (parcialmente concluido)
+  - Filtros avancados no ranking: ordenacao por coluna + paginacao (10/25/50) ✅
+  - Exportacao CSV no Ranking e Sources ✅
+  - Profile page: mantido mock (sem auth no sistema)
 ```
+
+---
+
+## 2026-06-22 (Frontend features: ordenacao, paginacao, export CSV)
+
+### Resumo executivo
+
+Branch `feat/frontend-features` — implementados ordenacao por coluna com setas visuais, paginacao cliente-side com seletor de linhas por pagina (10/25/50) e exportacao CSV nas paginas Ranking e Sources.
+
+### O que mudou
+
+- `frontend/src/lib/export-csv.ts` (novo): utility que gera CSV com BOM UTF-8, escape de virgulas/aspas/quebras e nome de arquivo com data.
+- `frontend/src/routes/ranking.tsx`:
+  - Ordenacao por coluna: clique no header alterna asc/desc com icone visual (ArrowUp/ArrowDown/ArrowUpDown).
+  - Filtros resetam pagina para 0 ao mudar.
+  - Paginacao com seletor 10/25/50 linhas, botoes anterior/proximo e numeros de pagina.
+  - Botao "CSV" que exporta todas as startups filtradas (nao so a pagina atual).
+  - Componente `ThSort` reaproveitavel com props `field`, `sortField`, `sortDir`, `onToggle`.
+- `frontend/src/routes/sources.tsx`:
+  - Botao "CSV" ao lado da busca que exporta fontes + claims + status.
+
+### Decisoes
+
+- Export exporta **todas** as linhas filtradas, nao apenas a pagina atual — util para o usuario levar tudo para Excel.
+- Paginacao cliente-side: como o backend retorna todas as startups de uma vez (poucas dezenas), nao precisa de `?offset=&limit=` no backend ainda.
+
+### Validacoes
+
+```text
+npm run build -> ok (0 erros)
+```
+
+### Pontos pendentes
+
+- Paginacao backend seria necessaria se a base crescer para centenas de startups.
+- Profile page permanece mock (sem auth system).
