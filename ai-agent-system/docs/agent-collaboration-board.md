@@ -89,7 +89,7 @@ scraping real controlado
 Resumo atual:
 
 ```text
-Codex concluiu UX fix: logos de empresas em Ranking e Contacts agora navegam para /startup/{id}. Validacoes: ESLint dos arquivos tocados ok, npm run build ok, pip check ok, pytest 150 passed.
+Codex concluiu provider config fix: backend carrega .env da raiz e do ai-agent-system via get_settings(), sem expor segredos. Proximo foco: recomendacoes vazias no fluxo real.
 ```
 
 Ultima atualizacao:
@@ -107,7 +107,7 @@ Quando Codex ou Opencode iniciar uma tarefa nova, atualizar esta secao com o que
 
 Status: nenhuma no momento.
 
-Codex nao usara APIs externas, rede, chaves ou providers reais nesta tarefa.
+Usuario autorizou Firecrawl/LLM configurados no .env local para testes controlados. Nao usar outras APIs externas, custos ou providers novos sem nova autorizacao explicita.
 
 Use esta secao quando algo depender diretamente do usuario.
 
@@ -164,21 +164,21 @@ Status: concluido por Codex.
 Objetivo atual:
 
 ```text
-UX fix: logos clicaveis em Ranking/Contacts; proximo bloco sera preflight real autorizado.
+Provider config fix concluido: leitura segura do .env da raiz para Firecrawl/LLM reais autorizados; proximo bloco e diagnosticar recomendacoes vazias no fluxo real.
 ```
 ## Arquivos reservados
 
 Agente: Codex
 Arquivos:
 - ai-agent-system/docs/agent-collaboration-board.md
-- frontend/src/routes/ranking.tsx
-- frontend/src/routes/contacts.tsx
+- ai-agent-system/src/radar/settings.py
+- ai-agent-system/tests/test_external_provider_settings.py
 Motivo:
-- Tornar o clique no ícone/logo das empresas consistente com a navegação para /startup/{id} fora do dashboard.
+- Garantir que o backend leia o .env da raiz do repo e permita preflight real autorizado sem imprimir segredos.
 Inicio:
 - 2026-06-21
 Fim:
-- 2026-06-21
+- 2026-06-22
 
 Quando um agente for editar, registrar assim:
 

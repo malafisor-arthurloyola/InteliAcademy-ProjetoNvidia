@@ -1134,3 +1134,48 @@ Migrar as proximas telas que ainda dependem de mocks:
 2. Startup Detail: mapear `StartupRecord` real e associar fontes/claims quando houver run relacionado.
 3. Briefing: buscar recomendacoes reais de `GET /runs/{id}` em vez de briefing demo.
 4. Contacts/Profile: manter como backlog ou marcar explicitamente como dados nao implementados.
+## 2026-06-22 (Settings carregando .env da raiz)
+
+### Resumo executivo
+
+Foi corrigido o carregamento de configuracao para que o backend leia o `.env` da raiz do repositorio e tambem um eventual `.env` dentro de `ai-agent-system`, sem expor segredos e sem tornar os testes dependentes do ambiente local.
+
+### O que mudou
+
+- `ai-agent-system/src/radar/settings.py`
+  - adicionou `ENV_FILES` com os caminhos da raiz do repo e do backend;
+  - manteve `RadarSettings()` isolado e seguro por padrao;
+  - fez `get_settings()` carregar os arquivos `.env` configurados.
+- `ai-agent-system/tests/test_external_provider_settings.py`
+  - adicionou cobertura para os caminhos de `.env` esperados;
+  - confirmou que `RadarSettings()` puro continua fail-closed.
+- `ai-agent-system/tests/test_api_preflight.py`
+  - passou a isolar a rota `/providers/preflight` do `.env` real via monkeypatch, mantendo teste deterministico.
+
+### Por que isso importa
+
+O usuario mantem as chaves reais no `.env` da raiz. Antes, processos iniciados dentro de `ai-agent-system` podiam nao enxergar esse arquivo. Agora o runtime consegue ler a configuracao real autorizada, enquanto os testes continuam usando fixtures/fail-closed quando precisam.
+
+Fluxo de configuracao:
+
+```text
+backend FastAPI / LangGraph
+ -> get_settings()
+ -> .env da raiz + .env do ai-agent-system
+ -> provider_factory / preflight
+ -> Firecrawl/LLM apenas quando RADAR_ENABLE_EXTERNAL_PROVIDERS=true
+```
+
+### Validacoes
+
+```text
+ruff check src/radar/settings.py tests/test_external_provider_settings.py tests/test_provider_preflight.py tests/test_api_preflight.py -> All checks passed.
+pip check -> No broken requirements found.
+pytest tests/test_external_provider_settings.py tests/test_provider_preflight.py tests/test_api_preflight.py -> 14 passed, 1 warning conhecido.
+```
+
+Observacao: a tentativa de `pytest` completo foi interrompida porque a suite esta demorando muito no ambiente atual. A validacao focada cobre exatamente a mudanca de configuracao/preflight. Proximo passo tecnico recomendado: separar ou marcar testes caros de RAG/embeddings para que a validacao completa volte a ser ergonomica.
+
+### Proximo passo sugerido
+
+Investigar por que uma execucao real com Firecrawl/LLM encontra fontes, mas retorna recomendacoes vazias. O diagnostico inicial indica que o extractor pode misturar multiplas startups em um unico perfil e que o RAG/recommendation nao esta recebendo gaps tecnicos suficientes para gerar recomendacoes NVIDIA.

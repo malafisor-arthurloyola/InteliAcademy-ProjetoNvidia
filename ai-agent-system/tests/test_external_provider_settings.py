@@ -10,7 +10,24 @@ from radar.scraping.adapters import (
     FirecrawlPageAdapter,
     SerpApiSearchAdapter,
 )
-from radar.settings import RadarSettings
+from radar.settings import ENV_FILES, RadarSettings, get_settings
+
+
+def test_settings_look_for_repo_root_and_backend_env_files() -> None:
+    env_paths = [path.name for path in ENV_FILES]
+    parent_names = [path.parent.name for path in ENV_FILES]
+
+    assert env_paths == [".env", ".env"]
+    assert "InteliAcademy-ProjetoNvidia" in parent_names
+    assert "ai-agent-system" in parent_names
+
+
+def test_get_settings_loads_configured_env_files() -> None:
+    get_settings.cache_clear()
+    settings = get_settings()
+    get_settings.cache_clear()
+
+    assert isinstance(settings, RadarSettings)
 
 
 def test_external_providers_are_disabled_by_default() -> None:
@@ -22,14 +39,18 @@ def test_external_providers_are_disabled_by_default() -> None:
     assert settings.page_provider == "fixture"
 
 
-def test_configured_serpapi_adapter_fails_closed_without_external_authorization() -> None:
+def test_configured_serpapi_adapter_fails_closed_without_external_authorization() -> (
+    None
+):
     adapter = ConfiguredSerpApiSearchAdapter(settings=RadarSettings())
 
     with pytest.raises(ExternalProviderDisabledError, match="explicit authorization"):
         adapter.search(_search_plan())
 
 
-def test_configured_firecrawl_adapter_fails_closed_without_external_authorization() -> None:
+def test_configured_firecrawl_adapter_fails_closed_without_external_authorization() -> (
+    None
+):
     candidate = SerpApiSearchAdapter(
         [{"url": "https://example.com", "title": "Example", "snippet": "AI startup"}]
     ).search(_search_plan())[0]
