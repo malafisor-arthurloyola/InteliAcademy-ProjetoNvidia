@@ -164,7 +164,7 @@ Status: concluido por Codex.
 Objetivo atual:
 
 ```text
-Provider config fix concluido: leitura segura do .env da raiz para Firecrawl/LLM reais autorizados; proximo bloco e diagnosticar recomendacoes vazias no fluxo real.
+Correcao aplicada para recomendacoes vazias: extractor usa nome extraido, RAG expande termos PT/EN e recommendation cobre todas tecnologias seed. Validacoes focadas ok.
 ```
 ## Arquivos reservados
 
@@ -180,6 +180,21 @@ Inicio:
 Fim:
 - 2026-06-22
 
+
+Agente: Codex
+Arquivos:
+- ai-agent-system/docs/agent-collaboration-board.md
+- ai-agent-system/src/radar/agents/recommendation.py
+- ai-agent-system/src/radar/agents/nvidia_rag.py
+- ai-agent-system/src/radar/agents/extractor.py (somente se o diagnostico confirmar mistura/nome errado de startup)
+- ai-agent-system/tests/test_recommendation_mapping.py
+- ai-agent-system/tests/test_rag_pipeline.py (somente se alterar RAG)
+Motivo:
+- Corrigir o caso real em que o pipeline encontra fontes/classifica startup, mas retorna recommendations vazio.
+Inicio:
+- 2026-06-22
+Fim:
+- 2026-06-22
 Quando um agente for editar, registrar assim:
 
 ```text

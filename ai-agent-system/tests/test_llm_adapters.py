@@ -60,6 +60,7 @@ class TestLLMProviderFactories:
 
 class TestLLMPrompts:
     def test_extraction_prompt_contains_expected_fields(self) -> None:
+        assert "name" in EXTRACTION_PROMPT
         assert "sector" in EXTRACTION_PROMPT
         assert "product" in EXTRACTION_PROMPT
         assert "founders" in EXTRACTION_PROMPT

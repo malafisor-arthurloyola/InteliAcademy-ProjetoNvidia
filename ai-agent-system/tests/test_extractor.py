@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 
 from pydantic import HttpUrl
@@ -10,6 +11,7 @@ from radar.agents.extractor import (
     extract_startups_and_claims,
 )
 from radar.schemas import SourceDocument
+from radar.settings import RadarSettings
 
 
 def _source(text: str, title: str | None = None, source_type: str = "official_site") -> SourceDocument:
@@ -107,3 +109,31 @@ def test_extractor_collects_ai_claims_across_multiple_sources() -> None:
     _, claims = extract_startups_and_claims({"query": "MultiSource", "sources": sources})
     ai_claims = [c for c in claims if c.claim_type == "ai_usage"]
     assert len(ai_claims) >= 2
+
+
+def test_llm_extractor_uses_extracted_startup_name(monkeypatch) -> None:
+    from radar.agents import extractor as extractor_module
+
+    def fake_llm_response(**_kwargs) -> str:
+        return json.dumps({
+            "name": "Voa Health",
+            "sector": "Healthcare",
+            "product": "Voa Health",
+            "founders": ["Solano Todeschini"],
+            "funding": "US$3 million",
+            "technologies": ["LLM"],
+            "ai_usage_summary": "Evidence says Voa Health uses AI in healthcare workflows.",
+        })
+
+    monkeypatch.setattr(
+        extractor_module,
+        "get_settings",
+        lambda: RadarSettings(enable_external_providers=True),
+    )
+    monkeypatch.setattr(extractor_module, "run_llm_with_fallback", fake_llm_response)
+
+    sources = [_source("Voa Health uses AI for healthcare workflows.", "Voa Health")]
+    startups, _ = extract_startups_and_claims({"query": "startups brasileiras de IA em saude", "sources": sources})
+
+    assert startups[0].name == "Voa Health"
+    assert startups[0].sector == "Healthcare"

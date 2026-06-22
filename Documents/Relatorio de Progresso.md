@@ -1179,3 +1179,43 @@ Observacao: a tentativa de `pytest` completo foi interrompida porque a suite est
 ### Proximo passo sugerido
 
 Investigar por que uma execucao real com Firecrawl/LLM encontra fontes, mas retorna recomendacoes vazias. O diagnostico inicial indica que o extractor pode misturar multiplas startups em um unico perfil e que o RAG/recommendation nao esta recebendo gaps tecnicos suficientes para gerar recomendacoes NVIDIA.
+## 2026-06-22 (Correcoes para recomendacoes vazias no fluxo real)
+
+### Resumo executivo
+
+Foi corrigido o primeiro conjunto de causas para o caso em que o pipeline real pesquisava fontes, classificava a startup, mas retornava `recommendations` vazio. A mudanca preserva a regra principal do projeto: recomendacoes continuam bloqueadas quando faltam evidencias validadas, mas passam a ter melhor chance de receber contexto NVIDIA quando ha evidencias suficientes.
+
+### Diagnostico
+
+- O caminho LLM do extractor ignorava o nome extraido e gravava `name=query`, fazendo uma busca generica virar o nome da startup.
+- A busca RAG usava uma base seed majoritariamente em ingles; consultas/evidencias em portugues podiam recuperar chunks relevantes com score baixo.
+- `recommendation.py` descartava tecnologias existentes na base seed por falta de guidance, como `NVIDIA NeMo` e `NVIDIA AI Enterprise`.
+- Testes unitarios estavam sujeitos ao `.env` local habilitado, podendo tentar caminho LLM real por acidente e deixando `pytest` muito lento.
+
+### O que mudou
+
+- `src/radar/llm/prompts.py`
+  - prompt de extracao agora pede o campo `name`.
+- `src/radar/agents/extractor.py`
+  - `_llm_extract()` usa `parsed["name"]` quando presente, em vez de forcar `name=query`.
+- `src/radar/agents/nvidia_rag.py`
+  - adiciona expansao de busca PT/EN derivada da evidencia, por exemplo saude -> healthcare/clinical e voz/transcricao -> speech/ASR.
+- `src/radar/agents/recommendation.py`
+  - adiciona guidance para tecnologias seed que faltavam: `NVIDIA NeMo`, `CUDA`, `NVIDIA Morpheus` e `NVIDIA AI Enterprise`.
+- `tests/conftest.py`
+  - força `RADAR_ENABLE_EXTERNAL_PROVIDERS=false` durante testes unitarios, mantendo a suite deterministica mesmo com `.env` real habilitado.
+- Testes adicionados em extractor, prompt, RAG e recommendation mapping.
+
+### Validacoes
+
+```text
+ruff check nos arquivos tocados -> All checks passed.
+pip check -> No broken requirements found.
+pytest tests/test_extractor.py tests/test_llm_adapters.py::TestLLMPrompts tests/test_rag_pipeline.py::test_rag_expands_portuguese_health_voice_terms tests/test_recommendation_mapping.py::test_recommendation_guidance_covers_seed_knowledge_technologies tests/test_recommendation_mapping.py::test_graph_maps_healthcare_signals_to_clara tests/test_recommendation_mapping.py::test_graph_maps_voice_signals_to_riva_and_nim -> 18 passed.
+```
+
+Observacao: full `pytest` nao foi repetido nesta etapa por custo de tempo. Foi identificado que testes com RAG/embeddings sao caros e precisam de separacao futura em grupos unitarios/lentos.
+
+### Proximo passo sugerido
+
+Testar uma nova consulta real pelo site/API com Firecrawl/LLM habilitados e verificar se agora surgem recomendacoes. Se ainda houver mistura de multiplas startups em uma unica resposta, o proximo ajuste deve ser no extractor para separar entidades por startup em vez de montar um unico `StartupProfile` a partir de todas as fontes.

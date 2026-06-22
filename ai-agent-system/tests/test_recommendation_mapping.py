@@ -84,3 +84,12 @@ def test_graph_maps_latency_signals_to_tensorrt_llm() -> None:
 
 def _recommendation_technologies(result: dict) -> set[str]:
     return {recommendation.technology for recommendation in result["recommendations"]}
+
+
+def test_recommendation_guidance_covers_seed_knowledge_technologies() -> None:
+    from radar.agents.recommendation import TECHNOLOGY_GUIDANCE
+    from radar.rag.knowledge_base import get_seed_chunks
+
+    seed_technologies = {chunk["technology"] for chunk in get_seed_chunks()}
+
+    assert seed_technologies <= set(TECHNOLOGY_GUIDANCE)

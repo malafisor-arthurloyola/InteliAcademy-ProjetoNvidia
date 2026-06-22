@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unicodedata
 from typing import Any, cast, get_args
 
 from radar.graph.state import RadarState
@@ -9,6 +10,41 @@ from radar.schemas.recommendation import NvidiaTechnology
 
 
 NVIDIA_TECHNOLOGIES: set[str] = set(get_args(NvidiaTechnology))
+
+QUERY_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (
+        ("saude", "health", "healthcare", "medical", "medico", "clinica", "clinical"),
+        "healthcare medical clinical NVIDIA Clara",
+    ),
+    (
+        ("voz", "voice", "speech", "audio", "transcricao", "asr", "tts", "call center", "atendimento"),
+        "voice speech ASR TTS transcription NVIDIA Riva",
+    ),
+    (
+        ("llm", "generativa", "generative", "chatbot", "assistente", "assistant"),
+        "generative AI LLM NVIDIA NIM NVIDIA NeMo TensorRT-LLM",
+    ),
+    (
+        ("agente", "agents", "agent", "workflow", "guardrail", "governanca", "governance"),
+        "AI agents workflow governance NeMo Guardrails",
+    ),
+    (
+        ("latencia", "latency", "inferencia", "inference", "serving", "producao", "production"),
+        "production inference serving latency Triton TensorRT-LLM",
+    ),
+    (
+        ("dados", "data", "analytics", "tabular", "etl", "pipeline"),
+        "data analytics dataframe ETL NVIDIA RAPIDS cuDF cuML",
+    ),
+    (
+        ("robo", "robot", "robotica", "robotics", "simulacao", "simulation"),
+        "robotics simulation autonomy NVIDIA Isaac NVIDIA Omniverse",
+    ),
+    (
+        ("seguranca", "security", "cyber", "cybersecurity"),
+        "cybersecurity threat detection NVIDIA Morpheus",
+    ),
+)
 
 
 def retrieve_nvidia_context(state: RadarState) -> list[NvidiaKnowledgeChunk]:
@@ -45,6 +81,9 @@ def retrieve_nvidia_context(state: RadarState) -> list[NvidiaKnowledgeChunk]:
         query_parts.append(f"evidence: {claim_text[:1000]}")
 
     query = " ".join(query_parts) if query_parts else profile.description or ""
+    hints = _build_query_hints(query)
+    if hints:
+        query = f"{query} retrieval_hints: {' '.join(hints)}"
     if not query:
         return []
 
@@ -73,6 +112,24 @@ def retrieve_nvidia_context(state: RadarState) -> list[NvidiaKnowledgeChunk]:
         )
 
     return chunks
+
+
+def _build_query_hints(text: str) -> list[str]:
+    normalized = _normalize_for_hints(text)
+    hints: list[str] = []
+    for needles, hint in QUERY_HINTS:
+        if any(needle in normalized for needle in needles):
+            hints.append(hint)
+    return hints
+
+
+def _normalize_for_hints(text: str) -> str:
+    return (
+        unicodedata.normalize("NFKD", text)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+        .lower()
+    )
 
 
 def _as_score(value: Any) -> float:

@@ -122,11 +122,13 @@ def _llm_extract(
 
     technologies = parsed.get("technologies") or []
     ai_claims = [c for c in claims if c.claim_type == "ai_usage"]
-    usage_summary = parsed.get("ai_usage_summary") or _summarize_ai_usage(ai_claims, technologies, parsed.get("sector"))
+    sector = _text_or_none(parsed.get("sector"))
+    startup_name = _text_or_none(parsed.get("name")) or query
+    usage_summary = parsed.get("ai_usage_summary") or _summarize_ai_usage(ai_claims, technologies, sector)
 
     return StartupProfile(
-        name=query,
-        sector=parsed.get("sector"),
+        name=startup_name,
+        sector=sector,
         product=parsed.get("product"),
         description="Startup profile assembled from collected public evidence via LLM.",
         founders=parsed.get("founders") or [],
@@ -161,6 +163,11 @@ def _deterministic_extract(
         evidence_ids=[c.id for c in claims],
     )
 
+
+def _text_or_none(value: object) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
 
 def _parse_llm_json(text: str) -> dict | None:
     text = text.strip()

@@ -101,6 +101,38 @@ TECHNOLOGY_GUIDANCE = {
         "complexity": "high",
         "action": "Review robotics autonomy stack and identify a simulation or deployment proof of concept with Isaac.",
     },
+    "NVIDIA NeMo": {
+        "gap": "Generative AI workflow may need a structured path for customization, evaluation, and deployment readiness.",
+        "technical": "NeMo supports building, customizing, evaluating, and deploying generative AI models.",
+        "business": "A stronger generative AI lifecycle can help AI-native startups reduce model risk and improve product differentiation.",
+        "priority": "high",
+        "complexity": "medium",
+        "action": "Review the validated generative AI workflow and identify whether fine-tuning, evaluation, or model governance is the next bottleneck.",
+    },
+    "CUDA": {
+        "gap": "GPU-heavy AI workload may need lower-level acceleration or optimization.",
+        "technical": "CUDA is the foundation for NVIDIA GPU acceleration across AI, HPC, analytics, and simulation workloads.",
+        "business": "GPU acceleration can improve performance and cost efficiency when workloads outgrow generic CPU-only execution.",
+        "priority": "medium",
+        "complexity": "high",
+        "action": "Profile the validated workload and identify whether CUDA-backed libraries or custom kernels are warranted.",
+    },
+    "NVIDIA Morpheus": {
+        "gap": "Cybersecurity AI workflow may need real-time threat detection or anomaly analysis.",
+        "technical": "Morpheus supports GPU-accelerated cybersecurity pipelines for telemetry, anomaly detection, and threat response.",
+        "business": "Real-time cybersecurity AI can improve detection speed and strengthen enterprise value propositions.",
+        "priority": "medium",
+        "complexity": "high",
+        "action": "Map the cybersecurity data flow and evaluate whether Morpheus fits the validated detection workload.",
+    },
+    "NVIDIA AI Enterprise": {
+        "gap": "Production AI workflow may need enterprise-grade support, security, and stable deployment infrastructure.",
+        "technical": "NVIDIA AI Enterprise packages production AI software including NIM, Triton, RAPIDS, and enterprise support.",
+        "business": "Enterprise-grade AI infrastructure can reduce operational risk for startups selling into regulated or large-company environments.",
+        "priority": "medium",
+        "complexity": "medium",
+        "action": "Assess production, security, and support requirements for enterprise customers and evaluate AI Enterprise fit.",
+    },
 }
 
 

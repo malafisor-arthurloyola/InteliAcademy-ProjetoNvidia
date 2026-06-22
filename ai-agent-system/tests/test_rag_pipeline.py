@@ -153,3 +153,30 @@ class TestNvidiaRagAgent:
             "claims": [],
         }
         assert retrieve_nvidia_context(state) == []
+
+
+def test_rag_expands_portuguese_health_voice_terms() -> None:
+    from radar.agents.nvidia_rag import retrieve_nvidia_context
+
+    reset()
+    state = {
+        "classification": type("obj", (), {"label": "AI-Native"})(),
+        "validation": type("obj", (), {"has_minimum_evidence": True, "supporting_evidence_ids": ["claim_1"]})(),
+        "extracted_startups": [
+            type("obj", (), {
+                "sector": None,
+                "product": "assistente de voz para saude",
+                "cited_technologies": [],
+                "ai_usage_summary": "IA generativa para transcricao medica e atendimento clinico.",
+                "description": "Startup de saude com IA.",
+                "evidence_ids": ["claim_1"],
+            })()
+        ],
+        "claims": [type("obj", (), {"id": "claim_1", "text": "A startup usa IA em saude, voz e transcricao medica."})()],
+    }
+
+    chunks = retrieve_nvidia_context(state)
+    technologies = {chunk.technology for chunk in chunks}
+
+    assert "NVIDIA Clara" in technologies
+    assert "NVIDIA Riva" in technologies

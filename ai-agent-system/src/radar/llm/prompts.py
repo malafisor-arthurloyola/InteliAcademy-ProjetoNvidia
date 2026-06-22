@@ -3,6 +3,7 @@ EXTRACTION_PROMPT = """You are an expert analyst extracting structured data abou
 Given the collected text below, extract the following fields. Return ONLY valid JSON (no markdown, no code blocks):
 
 {{
+  "name": "<startup/company name or null>",
   "sector": "<one of: Healthcare, Fintech, Agrotech, Edtech, Logistics, Retail, Legal, Real Estate, Energy, Cybersecurity, Gaming, Robotics, Data & Analytics, Voice AI, Sales & Marketing, Customer Service, or null>",
   "product": "<product name or null>",
   "founders": ["<founder name or empty list>"],
@@ -11,7 +12,7 @@ Given the collected text below, extract the following fields. Return ONLY valid 
   "ai_usage_summary": "<2-3 sentence summary of AI usage based on evidence>"
 }}
 
-Be conservative: only extract what is explicitly mentioned. Use null for unknown fields.
+Be conservative: only extract what is explicitly mentioned. Use null for unknown fields. If the search query is generic, infer the startup name from the collected source text, not from the query.
 For technologies, list both NVIDIA and non-NVIDIA technologies cited.
 Keep ai_usage_summary factual, citing specific evidence from the text."""
 
