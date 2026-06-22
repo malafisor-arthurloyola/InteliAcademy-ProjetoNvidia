@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Card } from "@/components/ui/card";
+import { ArrowRight, Handshake, Mail, Phone } from "lucide-react";
+import { ApiErrorDisplay } from "@/components/api-error-display";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -12,103 +14,94 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { startups } from "@/lib/mock-data";
+import {
+  CompanyLogo,
+  ContactStatusBadge,
+  SectionTitle,
+} from "@/components/ui-bits";
+import type { ApiError } from "@/lib/api";
+import { formatDate, parseListField, unavailable } from "@/lib/api-derived";
 import {
   CONTACT_STATUSES,
   setContactStatus,
   useContacts,
   type ContactStatus,
 } from "@/lib/contacts-store";
-import {
-  CompanyLogo,
-  ContactStatusBadge,
-  SectionTitle,
-} from "@/components/ui-bits";
-import { getCompanyExtras } from "@/lib/company-extras";
 import { useHealth } from "@/lib/hooks/use-health";
-import { ApiErrorDisplay } from "@/components/api-error-display";
-import type { ApiError } from "@/lib/api";
-import { ArrowRight, Mail, Phone, Handshake } from "lucide-react";
+import { useStartups } from "@/lib/hooks/use-startups";
 
 export const Route = createFileRoute("/contacts")({
-  head: () => ({ meta: [{ title: "Contatos — NVIDIA Toph" }] }),
+  head: () => ({ meta: [{ title: "Contatos - NVIDIA Toph" }] }),
   component: ContactsPage,
 });
 
 const FILTERS: (ContactStatus | "Todas")[] = ["Todas", ...CONTACT_STATUSES];
+const DEFAULT_STATUS = CONTACT_STATUSES[0];
 
 function ContactsPage() {
   const contacts = useContacts();
-  const {
-    data: health,
-    error: healthError,
-    refetch: retryHealth,
-  } = useHealth();
+  const healthQuery = useHealth();
+  const startupsQuery = useStartups();
+  const startups = useMemo(
+    () => startupsQuery.data ?? [],
+    [startupsQuery.data],
+  );
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Todas");
 
   const rows = useMemo(() => {
+    const query = search.trim().toLowerCase();
     return startups
-      .map((s) => ({
-        s,
-        rec: contacts[s.id] ?? {
-          status: "Não contactada" as ContactStatus,
-          updatedAt: "",
-        },
+      .map((startup) => ({
+        startup,
+        rec: contacts[startup.id] ?? { status: DEFAULT_STATUS, updatedAt: "" },
       }))
-      .filter(({ s, rec }) => {
+      .filter(({ startup, rec }) => {
         if (filter !== "Todas" && rec.status !== filter) return false;
-        if (search && !s.name.toLowerCase().includes(search.toLowerCase()))
-          return false;
-        return true;
+        if (!query) return true;
+        const haystack = [
+          startup.name,
+          startup.sector ?? "",
+          startup.product ?? "",
+          startup.classification_label ?? "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(query);
       })
       .sort((a, b) =>
         (b.rec.updatedAt || "").localeCompare(a.rec.updatedAt || ""),
       );
-  }, [contacts, search, filter]);
+  }, [contacts, filter, search, startups]);
 
   const counts = useMemo(() => {
-    const c: Record<ContactStatus, number> = {
-      "NÃ£o contactada": 0,
-      Contactada: 0,
-      "Aguardando resposta": 0,
-      "Em negociaÃ§Ã£o": 0,
-      "Contrato fechado": 0,
-      "Contrato recusado": 0,
-    };
-    for (const s of startups) {
-      const status = contacts[s.id]?.status ?? "NÃ£o contactada";
-      c[status]++;
+    const countMap = Object.fromEntries(
+      CONTACT_STATUSES.map((status) => [status, 0]),
+    ) as Record<ContactStatus, number>;
+    for (const startup of startups) {
+      const status = contacts[startup.id]?.status ?? DEFAULT_STATUS;
+      countMap[status]++;
     }
-    return c;
-  }, [contacts]);
-  if (healthError) {
+    return countMap;
+  }, [contacts, startups]);
+
+  const error = healthQuery.error ?? startupsQuery.error;
+  if (error) {
     return (
       <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
         <ApiErrorDisplay
-          error={healthError as ApiError}
-          onRetry={() => retryHealth()}
+          error={error as ApiError}
+          onRetry={() => {
+            void healthQuery.refetch();
+            void startupsQuery.refetch();
+          }}
         />
       </div>
     );
   }
 
-  if (!health) {
-    return (
-      <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
-        <Card className="p-4">
-          <div className="space-y-3">
-            <Skeleton className="h-6 w-64" />
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Skeleton key={i} className="h-16" />
-              ))}
-            </div>
-            <Skeleton className="h-64 w-full" />
-          </div>
-        </Card>
-      </div>
-    );
+  if (healthQuery.isLoading || startupsQuery.isLoading) {
+    return <ContactsSkeleton />;
   }
 
   return (
@@ -123,28 +116,27 @@ function ContactsPage() {
               </h1>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Controle qual startup já foi abordada e em que estágio está cada
-              negociação.
+              Controle de contato usando startups reais da API. Canais de
+              contato ainda nao existem no backend.
             </p>
           </div>
+          <Badge variant="outline" className="text-[11px]">
+            {startups.length} startup(s) reais
+          </Badge>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          {CONTACT_STATUSES.map((s) => (
+          {CONTACT_STATUSES.map((status) => (
             <button
-              key={s}
-              onClick={() => setFilter(s)}
-              className={`rounded-md border px-3 py-2 text-left transition ${
-                filter === s
-                  ? "border-primary/40 bg-primary/5"
-                  : "border-border hover:bg-muted/40"
-              }`}
+              key={status}
+              onClick={() => setFilter(status)}
+              className={`rounded-md border px-3 py-2 text-left transition ${filter === status ? "border-primary/40 bg-primary/5" : "border-border hover:bg-muted/40"}`}
             >
               <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                {s}
+                {status}
               </p>
               <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
-                {counts[s]}
+                {counts[status]}
               </p>
             </button>
           ))}
@@ -156,7 +148,7 @@ function ContactsPage() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar empresa…"
+            placeholder="Buscar empresa..."
             className="h-9 sm:max-w-xs"
           />
           <Select
@@ -167,25 +159,26 @@ function ContactsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {FILTERS.map((f) => (
-                <SelectItem key={f} value={f}>
-                  {f}
+              {FILTERS.map((item) => (
+                <SelectItem key={item} value={item}>
+                  {item}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Badge variant="outline" className="ml-auto text-[11px]">
-            {rows.length} resultados
+            {rows.length} resultado(s)
           </Badge>
         </div>
       </Card>
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse text-sm">
+          <table className="w-full min-w-[920px] border-collapse text-sm">
             <thead className="bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Empresa</th>
+                <th className="px-3 py-2 font-medium">Classificacao</th>
                 <th className="px-3 py-2 font-medium">Contato principal</th>
                 <th className="px-3 py-2 font-medium">Canal</th>
                 <th className="px-3 py-2 font-medium">Status</th>
@@ -194,77 +187,85 @@ function ContactsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ s, rec }) => {
-                const x = getCompanyExtras(s.id);
+              {rows.map(({ startup, rec }) => {
+                const founders = parseListField(startup.founders);
                 return (
                   <tr
-                    key={s.id}
+                    key={startup.id}
                     className="border-t border-border hover:bg-muted/30"
                   >
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2.5">
                         <Link
                           to="/startup/$id"
-                          params={{ id: s.id }}
-                          aria-label={`Abrir perfil de ${s.name}`}
+                          params={{ id: startup.id }}
+                          aria-label={`Abrir perfil de ${startup.name}`}
                           className="rounded-md outline-none ring-primary/40 transition hover:opacity-85 focus-visible:ring-2"
                         >
-                          <CompanyLogo id={s.id} name={s.name} size="sm" />
+                          <CompanyLogo
+                            id={startup.id}
+                            name={startup.name}
+                            size="sm"
+                          />
                         </Link>
                         <div className="min-w-0">
                           <div className="truncate font-medium text-foreground">
-                            {s.name}
+                            {startup.name}
                           </div>
                           <div className="truncate text-[11px] text-muted-foreground">
-                            {s.sector}
+                            {unavailable(startup.sector)}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-3 py-2.5">
+                      <Badge variant="outline" className="text-[10px]">
+                        {startup.classification_label ?? "Nao classificada"}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2.5">
                       <div className="text-xs font-medium text-foreground">
-                        {x.contact.primaryName}
+                        {founders[0] ?? "Nao disponivel"}
                       </div>
                       <div className="text-[11px] text-muted-foreground">
-                        {x.contact.primaryRole}
+                        Founder/contato nao validado
                       </div>
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex flex-col gap-0.5 text-[11px]">
-                        <a
-                          href={`mailto:${x.contact.email}`}
-                          className="inline-flex items-center gap-1 text-primary hover:underline"
-                        >
-                          <Mail className="h-3 w-3" /> {x.contact.email}
-                        </a>
                         <span className="inline-flex items-center gap-1 text-muted-foreground">
-                          <Phone className="h-3 w-3" /> {x.contact.phone}
+                          <Mail className="h-3 w-3" /> Nao disponivel
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                          <Phone className="h-3 w-3" /> Nao disponivel
                         </span>
                       </div>
                     </td>
-                    <td className="px-3 py-2.5 w-[200px]">
+                    <td className="w-[200px] px-3 py-2.5">
                       <Select
                         value={rec.status}
                         onValueChange={(v) =>
-                          setContactStatus(s.id, v as ContactStatus)
+                          setContactStatus(startup.id, v as ContactStatus)
                         }
                       >
                         <SelectTrigger className="h-8 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {CONTACT_STATUSES.map((cs) => (
-                            <SelectItem key={cs} value={cs} className="text-xs">
-                              {cs}
+                          {CONTACT_STATUSES.map((status) => (
+                            <SelectItem
+                              key={status}
+                              value={status}
+                              className="text-xs"
+                            >
+                              {status}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </td>
                     <td className="px-3 py-2.5 text-[11px] tabular-nums text-muted-foreground">
-                      {rec.updatedAt
-                        ? new Date(rec.updatedAt).toLocaleDateString("pt-BR")
-                        : "—"}
+                      {rec.updatedAt ? formatDate(rec.updatedAt) : "--"}
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <Button
@@ -273,7 +274,7 @@ function ContactsPage() {
                         variant="ghost"
                         className="gap-1 text-xs"
                       >
-                        <Link to="/startup/$id" params={{ id: s.id }}>
+                        <Link to="/startup/$id" params={{ id: startup.id }}>
                           Abrir <ArrowRight className="h-3 w-3" />
                         </Link>
                       </Button>
@@ -284,7 +285,7 @@ function ContactsPage() {
               {rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-3 py-10 text-center text-xs text-muted-foreground"
                   >
                     Nenhuma empresa com esse filtro.
@@ -299,9 +300,27 @@ function ContactsPage() {
       <Card className="p-4">
         <SectionTitle title="Legenda de status" />
         <div className="flex flex-wrap gap-2">
-          {CONTACT_STATUSES.map((s) => (
-            <ContactStatusBadge key={s} status={s} />
+          {CONTACT_STATUSES.map((status) => (
+            <ContactStatusBadge key={status} status={status} />
           ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function ContactsSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
+      <Card className="p-4">
+        <div className="space-y-3">
+          <Skeleton className="h-6 w-64" />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {[1, 2, 3, 4, 5, 6].map((item) => (
+              <Skeleton key={item} className="h-16" />
+            ))}
+          </div>
+          <Skeleton className="h-64 w-full" />
         </div>
       </Card>
     </div>

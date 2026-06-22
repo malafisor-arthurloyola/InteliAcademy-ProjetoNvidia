@@ -164,7 +164,7 @@ Status: concluido por Codex.
 Objetivo atual:
 
 ```text
-Correcao aplicada para recomendacoes vazias: extractor usa nome extraido, RAG expande termos PT/EN e recommendation cobre todas tecnologias seed. Validacoes focadas ok.
+Branch feat/frontend-pages: Startup Detail, Briefing e Contacts migradas para API real; Profile permanece mock; sem backend nesta branch.
 ```
 ## Arquivos reservados
 
@@ -195,6 +195,44 @@ Inicio:
 - 2026-06-22
 Fim:
 - 2026-06-22
+
+Agente: Codex
+Branch:
+- feat/frontend-pages
+Arquivos:
+- ai-agent-system/docs/agent-collaboration-board.md
+- frontend/src/routes/startup.$id.tsx
+- frontend/src/routes/briefing.tsx
+- frontend/src/routes/contacts.tsx
+- frontend/src/lib/api.ts (somente se faltar tipo/helper)
+- frontend/src/lib/hooks/* (somente se precisar hook auxiliar)
+- frontend/src/routeTree.gen.ts (se build atualizar)
+- Documents/Relatorio de Progresso.md
+Motivo:
+- Migrar paginas frontend combinadas para dados reais da FastAPI, usando associacao temporaria por nome/query enquanto startup_id no run ainda vem nulo.
+Inicio:
+- 2026-06-22
+Fim:
+- pendente
+
+Agente: Codex
+Branch:
+- feat/frontend-pages
+Arquivos:
+- ai-agent-system/docs/agent-collaboration-board.md
+- frontend/src/routes/startup.$id.tsx
+- frontend/src/routes/briefing.tsx
+- frontend/src/routes/contacts.tsx
+- frontend/src/lib/api.ts (somente se faltar tipo/helper)
+- frontend/src/lib/hooks/* (somente se precisar hook auxiliar)
+- frontend/src/routeTree.gen.ts (se build atualizar)
+- Documents/Relatorio de Progresso.md
+Motivo:
+- Migrar paginas frontend combinadas para dados reais da FastAPI, usando associacao temporaria por nome/query enquanto startup_id no run ainda vem nulo.
+Inicio:
+- 2026-06-22
+Fim:
+- pendente
 Quando um agente for editar, registrar assim:
 
 ```text
