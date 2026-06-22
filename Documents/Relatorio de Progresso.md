@@ -1219,3 +1219,46 @@ Observacao: full `pytest` nao foi repetido nesta etapa por custo de tempo. Foi i
 ### Proximo passo sugerido
 
 Testar uma nova consulta real pelo site/API com Firecrawl/LLM habilitados e verificar se agora surgem recomendacoes. Se ainda houver mistura de multiplas startups em uma unica resposta, o proximo ajuste deve ser no extractor para separar entidades por startup em vez de montar um unico `StartupProfile` a partir de todas as fontes.
+## 2026-06-22 (Frontend pages com API real na branch feat/frontend-pages)
+
+### Resumo executivo
+
+Foi criada a branch `feat/frontend-pages` a partir da `main` para migrar paginas do frontend que ainda usavam `mock-data`. A branch evita mexer no backend porque `feat/backend-scores` esta sendo trabalhada em paralelo pelo Opencode.
+
+### O que mudou
+
+- `frontend/src/lib/api-derived.ts`
+  - helpers para normalizar listas serializadas da API, score de confianca, datas e associacao temporaria startup -> run.
+  - a associacao usa `startup_id` quando existir e fallback por nome/query enquanto o backend ainda pode retornar `startup_id: null`.
+- `frontend/src/routes/startup.$id.tsx`
+  - deixou de usar `getStartup()` e `getCompanyExtras()` como fonte de dados principais;
+  - usa `useStartup(id)`, `useRuns()`, `useRun()`, `useRunSources()` e `useRunClaims()`;
+  - contato, telefone e e-mail inexistentes na API aparecem como `Nao disponivel`;
+  - recomendacoes e evidencias aparecem apenas se vierem do run real.
+- `frontend/src/routes/briefing.tsx`
+  - select de startups usa `useStartups()`;
+  - briefing e scores sao montados de classificacao, claims e recomendacoes reais;
+  - exportacao PDF continua mockada via toast, explicitamente.
+- `frontend/src/routes/contacts.tsx`
+  - tabela de empresas usa `useStartups()`;
+  - status de contato continua no localStorage;
+  - canais de contato ausentes na API aparecem como `Nao disponivel`.
+
+### Validacoes
+
+```text
+ESLint nos arquivos tocados -> ok
+npm run build -> ok
+Smoke local Vite:
+- GET http://127.0.0.1:5173/contacts -> 200
+- GET http://127.0.0.1:5173/briefing -> 200
+- GET http://127.0.0.1:5173/startup/test -> 200
+```
+
+Observacao: o Vite dev server ja estava rodando em `127.0.0.1:5173`; o backend FastAPI segue esperado em `127.0.0.1:8000`.
+
+### Pontos pendentes
+
+- `Profile` continua mock, conforme combinado.
+- `Overview` e `Ranking` ficam para a branch `feat/backend-scores`/Opencode.
+- Quando o backend persistir `startup_id` no run, a associacao temporaria por nome/query podera ser removida ou mantida apenas como fallback.
