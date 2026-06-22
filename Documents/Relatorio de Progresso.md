@@ -1346,3 +1346,59 @@ npm run build -> ok (0 erros)
 
 - Paginacao backend seria necessaria se a base crescer para centenas de startups.
 - Profile page permanece mock (sem auth system).
+
+---
+
+## 2026-06-22 (Alembic, healthcheck, start.ps1 — Fase 5 concluida)
+
+### Resumo executivo
+
+Implementados migracoes versionadas com Alembic (substituindo `init_db()` bruto), endpoint `/health/db` e script `start.ps1` de setup. A Fase 5 (Persistencia SQLite completa + deploy) esta concluida.
+
+### O que mudou
+
+- `ai-agent-system/requirements.txt`: adicionado `alembic` as dependencias.
+- `ai-agent-system/src/radar/database/alembic.ini` (novo): configuracao do Alembic apontando para `radar.db`.
+- `ai-agent-system/src/radar/database/alembic/env.py` (novo): importa `get_db_path()` da `connection.py` para resolver o caminho do banco dinamicamente.
+- `ai-agent-system/src/radar/database/alembic/script.py.mako` (novo): template para novas migracoes.
+- `ai-agent-system/src/radar/database/alembic/versions/0001_initial_schema.py` (novo): migracao inicial replicando exatamente o DDL de `init_db()` (6 tabelas: startups, runs, source_documents, evidence_claims, validations, recommendations).
+- `ai-agent-system/src/radar/api/app.py`:
+  - `lifespan` alterado para executar `alembic upgrade head` via API Python (com fallback para `init_db()` se `alembic.ini` nao existir).
+  - Nova rota `GET /health/db`: retorna status, path, lista de tabelas, contagem e tamanho em bytes.
+- `start.ps1` (novo, raiz do repo): ativa venv, executa `alembic upgrade head`, exibe comandos para rodar backend + frontend.
+
+### Validacoes
+
+```text
+pytest -> 129 passed, 1 flaky pre-existente
+alembic upgrade head -> OK
+alembic downgrade -1 -> OK
+start.ps1 -> OK (migra + exibe comandos)
+```
+
+### Estado final do projeto
+
+| Componente | Status |
+|---|---|
+| Backend FastAPI + SQLite | ✅ |
+| Alembic (migracoes versionadas) | ✅ |
+| LangGraph pipeline multiagente | ✅ |
+| Scraping (Firecrawl / Playwright) | ✅ |
+| LLM (Groq + fallback Gemini/OpenAI) | ✅ |
+| RAG (Qdrant + sentence-transformers) | ✅ |
+| Frontend Toph (7 paginas API-driven) | ✅ |
+| Healthcheck `/health`, `/health/db`, `/providers/preflight` | ✅ |
+| Script de deploy `start.ps1` | ✅ |
+
+### Proximos passos sugeridos
+
+```text
+Fase 7: Feature faltantes
+  - Profile page com dados reais (se houver auth)
+  - Filtros avancados no ranking (score range slider)
+  - Exportacao de relatorios em PDF
+Fase 8: Producao
+  - PostgreSQL como banco principal
+  - Containerizacao (Docker Compose)
+  - Deploy em nuvem (Render / Railway)
+```

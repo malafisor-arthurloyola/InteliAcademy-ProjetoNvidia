@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
+from alembic.config import Config as AlembicConfig
+from alembic import command as alembic_command
 from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,13 +34,26 @@ from radar.database import (
     update_run_startup,
     update_run_status,
 )
+from radar.database.connection import get_db_path
 from radar.graph.builder import build_graph
 from radar.scraping.provider_preflight import inspect_provider_setup
 
 
+_DB_DIR = Path(__file__).resolve().parent.parent / "database"
+_ALEMBIC_INI = _DB_DIR / "alembic.ini"
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
-    init_db()
+    if _ALEMBIC_INI.is_file():
+        cfg = AlembicConfig(str(_ALEMBIC_INI))
+        cfg.set_main_option(
+            "script_location",
+            str(_DB_DIR / "alembic"),
+        )
+        alembic_command.upgrade(cfg, "head")
+    else:
+        init_db()
     yield
 
 
@@ -108,6 +125,32 @@ def root() -> dict[str, str]:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/health/db")
+def health_db() -> dict[str, object]:
+    import sqlite3
+
+    db_path = get_db_path()
+    try:
+        conn = sqlite3.connect(db_path)
+        tables = [
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+            ).fetchall()
+        ]
+        conn.close()
+        size = os.path.getsize(db_path) if os.path.isfile(db_path) else 0
+        return {
+            "status": "ok",
+            "path": db_path,
+            "tables": tables,
+            "table_count": len(tables),
+            "size_bytes": size,
+        }
+    except Exception as exc:
+        return {"status": "error", "detail": str(exc)}
 
 
 @app.get("/providers/preflight")

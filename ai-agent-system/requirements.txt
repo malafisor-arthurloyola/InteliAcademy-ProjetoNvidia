@@ -26,6 +26,9 @@ qdrant-client
 rank-bm25
 cohere
 
+# Database migrations
+alembic
+
 # Utilities
 tenacity
 orjson

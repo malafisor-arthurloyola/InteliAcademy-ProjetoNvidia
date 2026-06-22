@@ -268,18 +268,25 @@ Resultado Codex (2026-06-21):
 - Validacoes: `pip check` ok, `ruff check src/radar tests` ok, `pytest` 145 passed, 2 warnings conhecidos.
 
 Resultado Opencode (2026-06-22):
-- Branch `feat/frontend-features` (a partir de main):
+- Branch `feat/frontend-features`:
   - `ranking.tsx`: ordenacao por coluna + paginacao (10/25/50) + export CSV
   - `sources.tsx`: export CSV
   - `lib/export-csv.ts` (novo): utility de CSV com UTF-8 BOM
-- npm run build ok, zero conflito com branch do Codex.
-- Commit: (pendente merge na main apos Codex finalizar)
+- npm run build ok, merged em main (commit `a6a7939`).
+
+Resultado Opencode (2026-06-22, Fase 5):
+- Branch `feat/alembic-deploy`:
+  - Alembic setup: `alembic.ini`, `env.py`, `script.py.mako`, migracao `0001_initial_schema.py`
+  - `app.py`: lifespan executa `alembic upgrade head` via API Python
+  - `GET /health/db`: retorna tabelas + tamanho do banco
+  - `start.ps1`: script de setup local (ativa venv → migra → instrucoes)
+- pytest 129 passed, upgrade/downgrade alembic OK.
 
 ## Mensagem para agentes
 
-Codex trabalhando em `feat/alembic-deploy` (Alembic + healthcheck + start.ps1).
-Opencode trabalhando em `feat/frontend-features` (ordenacao, paginacao, CSV).
-Branches paralelas, zero conflito de arquivos.
+Ambas as branches concluidas e merged em main.
+Nenhum conflito registrado em todo o ciclo.
+Proximas fases: features faltantes (Fase 7) ou producao (Fase 8).
 ## Decisoes tomadas
 
 - Primeiro estruturar base, schemas, LangGraph, validacao e testes.
