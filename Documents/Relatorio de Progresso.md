@@ -1402,3 +1402,59 @@ Fase 8: Producao
   - Containerizacao (Docker Compose)
   - Deploy em nuvem (Render / Railway)
 ```
+
+---
+
+## 2026-06-22 (Encerramento do ciclo — Fases 1 a 5 concluidas)
+
+### Resumo executivo
+
+Todas as fases planejadas do MVP estao concluidas. O projeto possui backend FastAPI funcional com LangGraph multiagente (8 agentes), scraping real (Firecrawl), LLM (Groq), RAG (Qdrant), migracoes versionadas (Alembic), frontend React Toph com 7 paginas consumindo API real, e script de deploy local.
+
+### O que foi feito na sessao
+
+- Fase 5 concluida (Alembic + `/health/db` + `start.ps1`)
+- Duas branches paralelas sem conflito: `feat/frontend-features` (ordenacao, paginacao, CSV) e `feat/alembic-deploy` (Alembic, healthcheck, deploy script)
+- Ambas merged em `main` (commits `a6a7939` + `c5bcf68`)
+- `.env` com `RADAR_ENABLE_EXTERNAL_PROVIDERS=true`, Firecrawl + Groq + OpenAI + Gemini configurados
+- Preflight confirma todos os provedores prontos: zero credenciais faltando
+
+### Validacoes finais
+
+```text
+pytest -> 129 passed, 1 flaky pre-existente (NeMo Guardrails)
+alembic upgrade head -> OK
+alembic downgrade -1 -> OK
+start.ps1 -> OK
+npm run build -> OK
+```
+
+### Estado final
+
+| Componente | Status |
+|---|---|
+| Backend FastAPI + SQLite (6 tabelas) | ✅ |
+| Alembic (migracoes versionadas) | ✅ |
+| LangGraph pipeline (8 agentes) | ✅ |
+| Scraping real (Firecrawl) | ✅ |
+| LLM (Groq + fallback Gemini/OpenAI) | ✅ |
+| RAG (Qdrant + sentence-transformers) | ✅ |
+| Frontend Toph (7 paginas API-driven) | ✅ |
+| Healthcheck (`/health`, `/health/db`, `/providers/preflight`) | ✅ |
+| Export CSV (Ranking + Sources) | ✅ |
+| Ordenacao por coluna + paginacao (Ranking) | ✅ |
+| Script de deploy (`start.ps1`) | ✅ |
+
+### Comandos para testar
+
+```powershell
+# Terminal 1 - Backend
+cd ai-agent-system
+..\venv\Scripts\python.exe -m uvicorn radar.api.app:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2 - Frontend
+cd frontend
+npm run dev
+
+# Abrir: http://localhost:5173
+```
