@@ -1458,3 +1458,33 @@ npm run dev
 
 # Abrir: http://localhost:5173
 ```
+
+---
+
+## 2026-06-22 (Reescrita do README + docs)
+
+### Resumo executivo
+
+README reescrito do zero com fluxograma Mermaid, status atualizado (Fases 1-5 concluidas), quick start completo, tabela de API endpoints, estrutura do projeto e comandos uteis. Relatorio de Progresso atualizado.
+
+### O que mudou
+
+- `README.md`: reescrito completo (estava desatualizado desde a Fase 2)
+  - Fluxograma do pipeline com Mermaid (8 agentes)
+  - Quick Start com comandos para 2 terminais
+  - Tabela de todas as 7 paginas do frontend
+  - Tabela de todos os 13 endpoints da API
+  - Estado do projeto atualizado (Fases 1-5 ✅)
+  - Estrutura de diretorios atualizada
+  - Comandos uteis (testes, lint, alembic, reset)
+- `Documents/Relatorio de Progresso.md`: entrada final da sessao
+
+### Proximos passos
+
+```text
+1. Corrigir pipeline para mostrar progresso em tempo real (update_status "running")
+2. Corrigir teste flaky do NeMo Guardrails
+3. Feature: Profile page com dados reais (se houver auth)
+4. Feature: Score range slider no ranking
+5. Produção: Docker, PostgreSQL, deploy
+```

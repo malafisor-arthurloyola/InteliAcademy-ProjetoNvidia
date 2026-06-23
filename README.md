@@ -1,147 +1,261 @@
-# InteliAcademy-ProjetoNvidia
+# NVIDIA Startup AI Radar — Toph
 
-Projeto NVIDIA Startup AI Radar — plataforma multiagente para encontrar, classificar e recomendar tecnologias NVIDIA para startups brasileiras AI-native.
+Plataforma multiagente para encontrar startups brasileiras com sinais de IA, classificar seu nível de maturidade AI-native e recomendar tecnologias NVIDIA personalizadas.
 
-## Status do Projeto
+**Toph** (codinome do frontend) — nome inspirado no personagem Avatar que sente vibrações na terra, como o radar sente sinais de IA nas startups.
+
+---
+
+## Stack
+
+| Camada | Tecnologia |
+|---|---|
+| Orquestração | LangGraph (8 agentes) |
+| Backend | Python 3.12 + FastAPI |
+| Frontend | React + TanStack Router + shadcn/ui + Recharts |
+| Banco | SQLite (dev) / PostgreSQL (futuro) |
+| Vetorial | Qdrant + sentence-transformers (all-MiniLM-L6-v2) |
+| Scraping | Firecrawl / Playwright / trafilatura |
+| LLM | Groq (primário) → OpenAI → Gemini (fallback) |
+| Migrações | Alembic |
+
+---
+
+## Fluxograma do Pipeline
+
+```mermaid
+graph TD
+    Q[Consulta do Usuário] --> SP[Search Planner<br/>Firecrawl Search]
+    SP --> SC[Scraper Agent<br/>Firecrawl / Playwright]
+    SC --> EX[Extractor Agent<br/>Groq LLM]
+    EX --> CL[Startup Classifier<br/>Groq LLM]
+    CL --> EV[Evidence Validator<br/>Regras + LLM]
+    EV --> NV[NVIDIA RAG Agent<br/>Qdrant + embeddings]
+    NV --> RE[Recommendation Agent<br/>Regras + LLM]
+    RE --> BR[Briefing Agent<br/>Montagem]
+    BR --> API[FastAPI<br/>Persiste no SQLite]
+    API --> UI[Frontend Toph<br/>7 páginas React]
+
+    style Q fill:#1a1a2e,stroke:#76B900
+    style UI fill:#1a1a2e,stroke:#76B900
+    style API fill:#1a1a2e,stroke:#76B900
+```
+
+### Agentes
+
+| # | Agente | Função | Provedor |
+|---|---|---|---|
+| 1 | **Search Planner** | Transforma consulta em estratégia de busca | Firecrawl |
+| 2 | **Scraper** | Coleta páginas públicas | Firecrawl / Playwright |
+| 3 | **Extractor** | Extrai nome, setor, produto, founders, funding, tecnologias | Groq / fallback determinístico |
+| 4 | **Classifier** | Classifica AI-Native / AI-Enabled / Non-AI com justificativa | Groq / fallback scoring |
+| 5 | **Validator** | Valida quantidade, qualidade e consistência das evidências | Regras + LLM |
+| 6 | **NVIDIA RAG** | Consulta base de conhecimento NVIDIA (NIM, NeMo, CUDA, etc.) | Qdrant + embeddings |
+| 7 | **Recommendation** | Mapeia gaps → tecnologias NVIDIA com prioridade e complexidade | Regras + LLM |
+| 8 | **Briefing** | Gera relatório executivo com evidências e recomendações | Montagem estruturada |
+
+---
+
+## Quick Start
+
+### Pré-requisitos
+
+- Python 3.12
+- Node.js 18+
+- `.env` configurado na raiz do repo (veja seção Configuração)
+
+### 1. Backend (FastAPI)
+
+```powershell
+cd ai-agent-system
+$env:PYTHONPATH = "$pwd\src"
+..\venv\Scripts\python.exe -m uvicorn radar.api.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 2. Frontend (Vite + React)
+
+```powershell
+cd frontend
+npm run dev
+```
+
+### 3. Abrir
+
+```
+http://localhost:5173
+```
+
+### Script único de setup
+
+```powershell
+.\start.ps1
+```
+
+Mostra as instruções e roda as migrações do banco.
+
+---
+
+## Páginas do Frontend
+
+| Página | URL | Descrição |
+|---|---|---|
+| **Overview** | `/` | Dashboard com métricas, gráfico de maturidade, top startups |
+| **Pipeline** | `/pipeline` | Executa o fluxo multiagente com animação em tempo real |
+| **Sources** | `/sources` | Auditoria de fontes coletadas, claims, export CSV |
+| **Ranking** | `/ranking` | Tabela de startups com ordenação, paginação, filtros, export CSV |
+| **Startup Detail** | `/startup/$id` | Perfil completo, evidências, recomendações |
+| **Briefing** | `/briefing` | Relatório executivo gerado por startup |
+| **Contacts** | `/contacts` | Gestão de contatos com status |
+| **Profile** | `/profile` | Perfil do usuário (mock — sem auth) |
+
+---
+
+## API Endpoints
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/` | Raiz do serviço |
+| `GET` | `/health` | Healthcheck básico |
+| `GET` | `/health/db` | Healthcheck do banco (tabelas + tamanho) |
+| `GET` | `/providers/preflight` | Status dos provedores externos |
+| `POST` | `/runs` | Executa o pipeline (body: `{"query": "..."}`) |
+| `GET` | `/runs` | Lista execuções |
+| `GET` | `/runs/{id}` | Detalhe de uma execução com recomendações |
+| `GET` | `/runs/{id}/sources` | Fontes coletadas em uma execução |
+| `GET` | `/runs/{id}/claims` | Evidências extraídas em uma execução |
+| `GET` | `/sources` | Lista todas as fontes |
+| `GET` | `/startups` | Lista startups com radar_score |
+| `GET` | `/startups/{id}` | Detalhe de uma startup |
+| `GET` | `/startups/{id}/runs` | Execuções de uma startup |
+
+---
+
+## Estado do Projeto
 
 | Fase | O que | Status |
 |---|---|---|
-| 1 | Scraping real (Firecrawl + Playwright) | ✅ CONCLUIDO |
-| 2 | LLM no Extractor e Classifier (Groq/OpenAI/Gemini) | ✅ CONCLUIDO |
-| 3 | RAG NVIDIA real (Qdrant in-memory) | 🔜 PROXIMO |
-| 4 | Persistência (SQLite) e frontend | 🔜 PROXIMO |
+| **1** | Estrutura base, schemas, LangGraph, validação, testes | ✅ |
+| **2** | Scraping real (Firecrawl, Playwright, trafilatura) | ✅ |
+| **3** | LLM no Extractor e Classifier (Groq + fallback) | ✅ |
+| **4a** | RAG NVIDIA (Qdrant + sentence-transformers) | ✅ |
+| **4b** | Frontend Toph completo (7 páginas API-driven) | ✅ |
+| **5** | Migrações versionadas (Alembic), healthcheck, start.ps1 | ✅ |
 
-## Ambiente Python
+---
 
-Versao oficial: Python 3.12.
+## Comandos Úteis
 
-As instrucoes de ambiente ficam em:
+```powershell
+# Testes
+cd ai-agent-system
+..\venv\Scripts\python.exe -m pytest
 
-`ai-agent-system/docs/ENVIRONMENT.md`
+# Lint
+..\venv\Scripts\python.exe -m ruff check src/radar/ tests/
 
-## Arquitetura
+# Migrações do banco
+..\venv\Scripts\python.exe -m alembic -c src\radar\database\alembic.ini upgrade head
 
-A arquitetura inicial dos entregaveis 1 e 2 fica em:
+# Rollback
+..\venv\Scripts\python.exe -m alembic -c src\radar\database\alembic.ini downgrade -1
 
-`ai-agent-system/docs/ARCHITECTURE.md`
+# Resetar banco
+Remove-Item ai-agent-system\src\radar\database\radar.db -Force
+```
 
-O codigo Python principal fica em:
+---
 
-`ai-agent-system/src/radar/`
-
-## Configuração de API Externa
-
-### 1. Provedores de Scraping (Firecrawl)
-
-Criar conta em [firecrawl.dev](https://www.firecrawl.dev/), habilitar **Scrape**, **Search**, **Crawl**.
+## Configuração (`.env`)
 
 ```env
 RADAR_ENABLE_EXTERNAL_PROVIDERS=true
 RADAR_SEARCH_PROVIDER=firecrawl
 RADAR_PAGE_PROVIDER=firecrawl
-FIRECRAWL_API_KEY=fc-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-### 2. Provedores de LLM (Groq primario + OpenAI/Gemini fallback)
-
-```env
 RADAR_LLM_PROVIDER=groq
 RADAR_LLM_FALLBACKS='["openai","gemini"]'
-GROQ_API_KEY=gsk_...
-OPENAI_API_KEY=sk-...
-GEMINI_API_KEY=AIza...
+FIRECRAWL_API_KEY=fc-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GEMINI_API_KEY=AIzaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-### 3. Safety Switch
+### Safety Switch
 
-`RADAR_ENABLE_EXTERNAL_PROVIDERS=false` (padrão) → **nenhuma API externa roda**. Extractor/Classifier usam código determinístico (regex/scoring).
+`RADAR_ENABLE_EXTERNAL_PROVIDERS=false` (padrão) → nenhuma API externa roda. Extractor/Classifier usam código determinístico (regex/scoring). Útil para testes offline.
 
-### 4. Providers suportados
+### Providers Suportados
 
-| Provider | Search | Page | LLM | Custo |
-|---|---|---|---|---|
-| `fixture` | StaticSeedCollector (mock) | HtmlPageContentAdapter (mock) | Deterministico (regex/scoring) | Sempre disponivel |
-| `firecrawl` | FirecrawlSearchAdapter | FirecrawlPageAdapter | — | Requer API key |
-| `playwright` | — | PlaywrightPageAdapter (fallback) | — | Gratuito (local) |
-| `serpapi` | SerpApiSearchAdapter | — | — | Alternativo (fallback) |
-| `groq` | — | — | GroqProvider (Llama 3.3 70B) | Gratuito |
-| `openai` | — | — | OpenAIProvider (GPT-4o-mini) | Pago |
-| `gemini` | — | — | GeminiProvider (Gemini 2.0 Flash) | Gratuito |
+| Provider | Search | Page | LLM |
+|---|---|---|---|
+| `fixture` | Mock (StaticSeedCollector) | Mock (HtmlPageContentAdapter) | Determinístico |
+| `firecrawl` | FirecrawlSearchAdapter | FirecrawlPageAdapter | — |
+| `playwright` | — | PlaywrightPageAdapter | — |
+| `serpapi` | SerpApiSearchAdapter | — | — |
+| `groq` | — | — | Llama 3.3 70B |
+| `openai` | — | — | GPT-4o-mini |
+| `gemini` | — | — | Gemini 2.0 Flash |
+
+---
+
+## Estrutura do Projeto
+
+```text
+InteliAcademy-ProjetoNvidia/
+├── ai-agent-system/
+│   ├── src/radar/
+│   │   ├── agents/         # 8 agentes LangGraph
+│   │   ├── api/            # FastAPI (app.py + rotas)
+│   │   ├── database/       # SQLite + Alembic
+│   │   ├── graph/          # State, nodes, edges, builder
+│   │   ├── llm/            # Adaptadores Groq/OpenAI/Gemini + prompts
+│   │   ├── rag/            # Qdrant + sentence-transformers
+│   │   ├── schemas/        # Contratos Pydantic
+│   │   ├── scraping/       # Adaptadores Firecrawl/Playwright
+│   │   ├── services/       # Placeholder
+│   │   └── utils/          # Placeholder
+│   ├── tests/              # 129 testes
+│   ├── docs/               # Documentação complementar
+│   ├── skills/             # Skills dos agentes
+│   └── requirements.txt
+├── frontend/               # React + TanStack + shadcn/ui
+│   └── src/
+│       ├── routes/         # 8 páginas
+│       ├── components/     # UI components
+│       └── lib/            # API client, hooks, utils
+├── Documents/              # Relatorio de Progresso, handoff
+├── .env                    # API keys (NÃO commitar)
+├── start.ps1              # Script de setup
+└── README.md
+```
+
+---
 
 ## Testes
 
-### Offline (sem APIs externas)
+129 testes (1 flaky pre-existente):
 
-Testa todo o pipeline com mocks. Não requer `.env` configurado:
+| Suite | Tests |
+|---|---|
+| `test_extractor.py` | 11 |
+| `test_classifier.py` | 7 |
+| `test_llm_adapters.py` | 15 |
+| `test_playwright_adapter.py` | 9 |
+| `test_provider_factory.py` | 6 |
+| `test_provider_preflight.py` | 7 |
+| `test_scraping_adapters.py` | 8 |
+| `test_source_normalizers.py` | 6 |
+| `test_graph_mvp.py` | 3 |
+| `test_evidence_pipeline.py` | 2 |
+| `test_recommendation_mapping.py` | 8 |
+| `test_retry_policy.py` | 3 |
+| `test_briefing.py` | 2 |
+| `test_external_provider_settings.py` | 4 |
+| `test_api_preflight.py` | 1 |
+| `test_api_crud.py` | 28 |
+| `test_recommendation_mapping.py` | 8 |
+| (outros) | + |
 
 ```powershell
 cd ai-agent-system
 ..\venv\Scripts\python.exe -m pytest
-```
-
-92 testes:
-
-| Suite | O que testa | Tests |
-|---|---|---|
-| `test_extractor.py` | Extracao deterministica (regex): setor, produto, founders, funding, tecnologias | 11 |
-| `test_classifier.py` | Classificacao deterministica: AI-Native, AI-Enabled, Non-AI, NVIDIA caveats | 7 |
-| `test_llm_adapters.py` | LLM adapter: safety switch, providers, prompts, fallback chain, preflight | 15 |
-| `test_playwright_adapter.py` | Playwright adapter: safety switch, factory, preflight | 9 |
-| `test_provider_factory.py` | Provider factory: fixture, firecrawl, serpapi, playwright | 6 |
-| `test_provider_preflight.py` | Preflight offline: fixture, firecrawl, serpapi, playwright, LLM | 7 |
-| `test_scraping_adapters.py` | Adaptadores de scraping: SerpAPI, PageContent, HTML bruto, Firecrawl | 8 |
-| `test_source_normalizers.py` | Normalizacao de payloads: URL, formato, batch | 6 |
-| `test_graph_mvp.py` | Pipeline completo do LangGraph | 3 |
-| `test_evidence_pipeline.py` | Pipeline de evidencias: extracao + validacao | 2 |
-| `test_recommendation_mapping.py` | Mapeamento de sinais para tecnologias NVIDIA | 8 |
-| `test_retry_policy.py` | Politica de retry da coleta | 3 |
-| `test_briefing.py` | Briefing final com caveats | 2 |
-| `test_external_provider_settings.py` | Safety switch: providers desligados por padrao | 4 |
-| `test_api_preflight.py` | Endpoint FastAPI GET /providers/preflight | 1 |
-
-### Integração com Firecrawl (requer API key)
-
-```powershell
-$env:RADAR_ENABLE_EXTERNAL_PROVIDERS='true'
-$env:RADAR_SEARCH_PROVIDER='firecrawl'
-$env:RADAR_PAGE_PROVIDER='firecrawl'
-$env:FIRECRAWL_API_KEY='fc-...'
-python -m pytest tests/test_scraping_adapters.py -v -k firecrawl
-```
-
-### Integração com Playwright (fallback)
-
-```powershell
-$env:RADAR_ENABLE_EXTERNAL_PROVIDERS='true'
-$env:RADAR_SEARCH_PROVIDER='firecrawl'
-$env:RADAR_PAGE_PROVIDER='playwright'
-$env:FIRECRAWL_API_KEY='fc-...'
-python -m pytest tests/test_playwright_adapter.py -v
-```
-
-### Pipeline completo com LLM real
-
-```powershell
-$env:RADAR_ENABLE_EXTERNAL_PROVIDERS='true'
-$env:PYTHONPATH='src'
-..\venv\Scripts\python.exe -c "
-from radar.graph.builder import build_graph
-r = build_graph().invoke({'query': 'startup brasileira de IA', 'collection_attempts': 0})
-print('Sources:', len(r['sources']))
-print('Profile:', r.get('extracted_startups'))
-print('Classification:', r.get('classification'))
-"
-```
-
-### Testar LLM adapter direto
-
-```powershell
-$env:RADAR_ENABLE_EXTERNAL_PROVIDERS='true'
-$env:PYTHONPATH='src'
-..\venv\Scripts\python.exe -c "
-from radar.llm.adapters import run_llm_with_fallback
-from radar.llm.prompts import EXTRACTION_PROMPT
-result = run_llm_with_fallback(EXTRACTION_PROMPT, 'Extract info about a startup')
-print(result)
-"
 ```
