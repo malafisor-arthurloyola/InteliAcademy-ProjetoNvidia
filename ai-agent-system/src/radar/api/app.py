@@ -164,6 +164,7 @@ def run_analysis(payload: RunRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="query must not be empty")
 
     run_id = save_run(payload.query)
+    update_run_status(run_id, "running")
     try:
         graph = build_graph()
         result: dict[str, Any] = graph.invoke(
