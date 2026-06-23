@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
@@ -12,6 +12,7 @@ from radar.database import (
     get_run_by_id,
     get_run_evidence_claims,
     get_run_recommendations,
+    get_run_steps,
     get_run_source_documents,
     get_startup_by_id,
     init_db,
@@ -22,6 +23,7 @@ from radar.database import (
     save_startup,
     save_validation,
     update_run_status,
+    update_run_step_status,
 )
 from radar.database.connection import get_db_path
 
@@ -52,6 +54,7 @@ def test_init_db_creates_tables() -> None:
     assert "evidence_claims" in names
     assert "validations" in names
     assert "recommendations" in names
+    assert "run_steps" in names
 
 
 def test_save_and_get_run() -> None:
@@ -62,6 +65,10 @@ def test_save_and_get_run() -> None:
     assert run is not None
     assert run["query"] == "test query"
     assert run["status"] == "pending"
+    steps = get_run_steps(run_id)
+    assert len(steps) == 8
+    assert steps[0]["step_key"] == "search_planner"
+    assert {step["status"] for step in steps} == {"pending"}
 
 
 def test_update_run_status() -> None:
@@ -70,6 +77,19 @@ def test_update_run_status() -> None:
     run = get_run_by_id(run_id)
     assert run["status"] == "completed"
     assert run["completed_at"] is not None
+
+
+def test_update_run_step_status() -> None:
+    run_id = save_run("test")
+    update_run_step_status(run_id, "extractor", "running")
+    steps = {step["step_key"]: step for step in get_run_steps(run_id)}
+    assert steps["extractor"]["status"] == "running"
+    assert steps["extractor"]["started_at"] is not None
+
+    update_run_step_status(run_id, "extractor", "completed")
+    steps = {step["step_key"]: step for step in get_run_steps(run_id)}
+    assert steps["extractor"]["status"] == "completed"
+    assert steps["extractor"]["completed_at"] is not None
 
 
 def test_save_and_get_startup() -> None:

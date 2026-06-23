@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from datetime import datetime
@@ -6,6 +6,19 @@ from typing import Any
 
 from radar.database.connection import get_connection
 
+
+PIPELINE_STEPS = (
+    "search_planner",
+    "scraper",
+    "extractor",
+    "validator",
+    "classifier",
+    "nvidia_rag",
+    "recommendation",
+    "briefing",
+)
+TERMINAL_RUN_STATUSES = {"completed", "failed"}
+TERMINAL_STEP_STATUSES = {"completed", "failed"}
 
 def init_db() -> None:
     with get_connection() as conn:
@@ -35,6 +48,16 @@ def init_db() -> None:
                 status TEXT NOT NULL DEFAULT 'pending',
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 completed_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS run_steps (
+                run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+                step_key TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                started_at TEXT,
+                completed_at TEXT,
+                error_message TEXT,
+                PRIMARY KEY (run_id, step_key)
             );
 
             CREATE TABLE IF NOT EXISTS source_documents (
@@ -91,15 +114,82 @@ def save_run(query: str, startup_id: str | None = None) -> int:
             "INSERT INTO runs (query, startup_id) VALUES (?, ?)",
             (query, startup_id),
         )
-        return cur.lastrowid or 0
+        run_id = cur.lastrowid or 0
+        conn.executemany(
+            "INSERT OR IGNORE INTO run_steps (run_id, step_key) VALUES (?, ?)",
+            [(run_id, step) for step in PIPELINE_STEPS],
+        )
+        return run_id
 
 
 def update_run_status(run_id: int, status: str) -> None:
+    completed_expr = "datetime('now')" if status in TERMINAL_RUN_STATUSES else "NULL"
     with get_connection() as conn:
         conn.execute(
-            "UPDATE runs SET status = ?, completed_at = datetime('now') WHERE id = ?",
+            f"UPDATE runs SET status = ?, completed_at = {completed_expr} WHERE id = ?",
             (status, run_id),
         )
+
+
+def update_run_step_status(
+    run_id: int,
+    step_key: str,
+    status: str,
+    error_message: str | None = None,
+) -> None:
+    if step_key not in PIPELINE_STEPS:
+        return
+
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO run_steps (run_id, step_key) VALUES (?, ?)",
+            (run_id, step_key),
+        )
+        if status == "running":
+            conn.execute(
+                """
+                UPDATE run_steps
+                SET status = ?, started_at = COALESCE(started_at, datetime('now')),
+                    completed_at = NULL, error_message = NULL
+                WHERE run_id = ? AND step_key = ?
+                """,
+                (status, run_id, step_key),
+            )
+            return
+
+        completed_expr = "datetime('now')" if status in TERMINAL_STEP_STATUSES else "NULL"
+        conn.execute(
+            f"""
+            UPDATE run_steps
+            SET status = ?, completed_at = {completed_expr}, error_message = ?
+            WHERE run_id = ? AND step_key = ?
+            """,
+            (status, error_message, run_id, step_key),
+        )
+
+
+def get_run_steps(run_id: int) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT step_key, status, started_at, completed_at, error_message
+            FROM run_steps
+            WHERE run_id = ?
+            ORDER BY CASE step_key
+                WHEN 'search_planner' THEN 1
+                WHEN 'scraper' THEN 2
+                WHEN 'extractor' THEN 3
+                WHEN 'validator' THEN 4
+                WHEN 'classifier' THEN 5
+                WHEN 'nvidia_rag' THEN 6
+                WHEN 'recommendation' THEN 7
+                WHEN 'briefing' THEN 8
+                ELSE 99
+            END
+            """,
+            (run_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def update_run_startup(run_id: int, startup_id: str) -> None:

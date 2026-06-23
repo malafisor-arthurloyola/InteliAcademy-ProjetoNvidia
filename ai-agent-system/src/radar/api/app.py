@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from collections.abc import AsyncGenerator
@@ -7,9 +7,9 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
-from fastapi import FastAPI, HTTPException
+from alembic.config import Config as AlembicConfig
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -22,6 +22,7 @@ from radar.database import (
     get_run_evidence_claims,
     get_run_recommendations,
     get_run_source_documents,
+    get_run_steps,
     get_runs_by_startup,
     get_startup_by_id,
     init_db,
@@ -33,6 +34,7 @@ from radar.database import (
     save_validation,
     update_run_startup,
     update_run_status,
+    update_run_step_status,
 )
 from radar.database.connection import get_db_path
 from radar.graph.builder import build_graph
@@ -94,7 +96,6 @@ def _persist_run_result(run_id: int, result: dict[str, Any]) -> None:  # noqa: C
         }
         startup_id = save_startup(startup_dict)
         update_run_startup(run_id, startup_id)
-        update_run_status(run_id, "completed")
 
         for src in result.get("sources", []):
             save_source_document(run_id, src.model_dump())
@@ -108,8 +109,36 @@ def _persist_run_result(run_id: int, result: dict[str, Any]) -> None:  # noqa: C
 
         for rec in result.get("recommendations", []):
             save_recommendation(run_id, rec.model_dump())
+
+        update_run_status(run_id, "completed")
     else:
         update_run_status(run_id, "failed")
+
+
+def _record_step_progress(
+    run_id: int,
+    step_key: str,
+    status: str,
+    error_message: str | None = None,
+) -> None:
+    update_run_step_status(run_id, step_key, status, error_message)
+
+
+def _execute_run_pipeline(run_id: int, query: str) -> None:
+    update_run_status(run_id, "running")
+    try:
+        graph = build_graph(
+            progress_callback=lambda step_key, status, error_message=None: _record_step_progress(
+                run_id, step_key, status, error_message
+            )
+        )
+        result: dict[str, Any] = graph.invoke(
+            {"query": query, "collection_attempts": 0}
+        )
+        _persist_run_result(run_id, result)
+    except Exception:
+        update_run_status(run_id, "failed")
+        raise
 
 
 @app.get("/")
@@ -159,24 +188,14 @@ def provider_preflight() -> dict[str, object]:
 
 
 @app.post("/runs")
-def run_analysis(payload: RunRequest) -> dict[str, Any]:
-    if not payload.query.strip():
+def run_analysis(payload: RunRequest, background_tasks: BackgroundTasks) -> dict[str, Any]:
+    query = payload.query.strip()
+    if not query:
         raise HTTPException(status_code=400, detail="query must not be empty")
 
-    run_id = save_run(payload.query)
-    update_run_status(run_id, "running")
-    try:
-        graph = build_graph()
-        result: dict[str, Any] = graph.invoke(
-            {"query": payload.query, "collection_attempts": 0}
-        )
-        _persist_run_result(run_id, result)
-        return jsonable_encoder(
-            {"run_id": run_id, "status": "completed", "result": result}
-        )
-    except Exception as exc:
-        update_run_status(run_id, "failed")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    run_id = save_run(query)
+    background_tasks.add_task(_execute_run_pipeline, run_id, query)
+    return jsonable_encoder({"run_id": run_id, "status": "pending"})
 
 
 @app.get("/runs")
@@ -209,6 +228,7 @@ def get_run(run_id: int) -> dict[str, Any]:
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
     run["recommendations"] = get_run_recommendations(run_id)
+    run["steps"] = get_run_steps(run_id)
     return run
 
 

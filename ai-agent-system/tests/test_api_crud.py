@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 
@@ -106,7 +106,7 @@ def test_run_analysis_with_fixture_succeeds() -> None:
     assert response.status_code == 200
     data = response.json()
     assert "run_id" in data
-    assert data["status"] == "completed"
+    assert data["status"] in {"pending", "running", "completed"}
 
 
 def test_run_analysis_can_be_queried_afterwards() -> None:
@@ -117,7 +117,10 @@ def test_run_analysis_can_be_queried_afterwards() -> None:
     get_resp = client.get(f"/runs/{run_id}")
     assert get_resp.status_code == 200
     assert get_resp.json()["query"] == "startup brasileira de IA"
-    assert get_resp.json()["status"] == "completed"
+    payload = get_resp.json()
+    assert payload["status"] == "completed"
+    assert len(payload["steps"]) == 8
+    assert payload["steps"][0]["step_key"] == "search_planner"
 
 
 def test_run_analysis_exposes_sources_and_claims_afterwards() -> None:

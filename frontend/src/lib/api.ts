@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000";
+﻿const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 export interface ApiError {
   endpoint: string;
@@ -78,6 +78,14 @@ export interface RecommendationRecord {
   nvidia_knowledge_ids: string;
 }
 
+export interface RunStepRecord {
+  step_key: string;
+  status: "pending" | "running" | "completed" | "failed" | string;
+  started_at: string | null;
+  completed_at: string | null;
+  error_message: string | null;
+}
+
 export interface RunDetail {
   id: number;
   query: string;
@@ -86,6 +94,7 @@ export interface RunDetail {
   created_at: string;
   completed_at: string | null;
   recommendations: RecommendationRecord[];
+  steps: RunStepRecord[];
 }
 
 export interface StartupRecord {

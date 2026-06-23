@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -30,7 +30,7 @@ const PIPELINE_STEPS: Step[] = [
   { key: "extractor", name: "Extractor", icon: FileText },
   { key: "classifier", name: "Classifier", icon: Tags },
   { key: "validator", name: "Validator", icon: ShieldCheck },
-  { key: "rag", name: "RAG Agent", icon: BookOpen },
+  { key: "nvidia_rag", name: "RAG NVIDIA", icon: BookOpen },
   { key: "recommendation", name: "Recommendation", icon: Lightbulb },
   { key: "briefing", name: "Briefing", icon: FileSpreadsheet },
 ];

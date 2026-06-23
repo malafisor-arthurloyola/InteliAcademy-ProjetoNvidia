@@ -1488,3 +1488,132 @@ README reescrito do zero com fluxograma Mermaid, status atualizado (Fases 1-5 co
 4. Feature: Score range slider no ranking
 5. Produção: Docker, PostgreSQL, deploy
 ```
+---
+
+## 2026-06-23 (Diagnostico de UX do Pipeline)
+
+### Problema observado
+
+Ao testar o frontend, a UI exibiu erro de comunicacao com o backend em `/health`:
+
+```text
+Falha na comunicacao com o backend
+Endpoint: /health
+Status: 0 (rede)
+Detalhe: Failed to fetch
+```
+
+O diagnostico local mostrou que esse erro nao vem diretamente dos agentes `extractor.py`, `classifier.py` ou `briefing.py`. Ele acontece quando o navegador nao consegue alcancar `http://localhost:8000`, normalmente porque o FastAPI nao esta rodando, esta reiniciando com `--reload`, esta em outra porta, ou esta ocupado em uma operacao pesada.
+
+### Achados tecnicos
+
+- `GET /health` respondeu `200 {"status":"ok"}` quando o backend estava ativo.
+- `GET /health/db`, `GET /runs` e `GET /startups` tambem responderam.
+- `GET /providers/preflight` funciona, mas pode levar alguns segundos.
+- Testes focados dos agentes passaram:
+
+```text
+pytest tests/test_extractor.py tests/test_classifier.py tests/test_briefing.py -q
+21 passed
+```
+
+- Um fluxo LangGraph em modo fixture/offline funcionou, mas levou cerca de 77 segundos no primeiro uso por causa do carregamento do modelo de embeddings `sentence-transformers/all-MiniLM-L6-v2` usado pelo RAG.
+
+### Causa principal da experiencia ruim
+
+O endpoint `POST /runs` executa o pipeline inteiro de forma sincrona antes de responder ao frontend:
+
+```text
+POST /runs
+ -> save_run
+ -> LangGraph completo
+ -> Firecrawl / LLM / validator / classifier / RAG / recommendation / briefing
+ -> persistencia
+ -> resposta ao frontend
+```
+
+Isso significa que a tela fica esperando a execucao completa antes de receber um `run_id`. O frontend ja possui polling, mas ele so consegue comecar a acompanhar o run depois que o backend termina praticamente todo o trabalho.
+
+### Correcao planejada
+
+Implementar uma arquitetura de UX mais transparente:
+
+```text
+POST /runs
+ -> cria run rapidamente
+ -> retorna run_id imediatamente
+ -> executa pipeline em background
+ -> frontend acompanha GET /runs/{id}
+```
+
+Tambem sera necessario registrar progresso por etapa, para a UI mostrar se o pipeline esta em `search_planner`, `scraper`, `extractor`, `validator`, `classifier`, `nvidia_rag`, `recommendation` ou `briefing`.
+---
+
+## 2026-06-23 (Pipeline em background + progresso por etapa)
+
+### Resumo executivo
+
+Foi corrigida a principal causa da experiencia ruim no Pipeline: `POST /runs` nao precisa mais esperar o LangGraph inteiro terminar para retornar ao frontend. Agora a API cria o run, retorna `run_id` rapidamente e executa o pipeline em background enquanto o frontend acompanha `GET /runs/{id}`.
+
+### O que mudou
+
+- `ai-agent-system/src/radar/database/repository.py`
+  - adicionada tabela `run_steps` no fallback `init_db()`;
+  - `save_run()` inicializa as 8 etapas do pipeline como `pending`;
+  - adicionadas funcoes `update_run_step_status()` e `get_run_steps()`;
+  - `update_run_status()` agora so preenche `completed_at` para estados terminais (`completed` e `failed`).
+- `ai-agent-system/src/radar/database/alembic/versions/0002_run_step_progress.py`
+  - migration nova para criar `run_steps` em bancos existentes.
+- `ai-agent-system/src/radar/graph/builder.py`
+  - `build_graph()` aceita callback opcional de progresso;
+  - cada node marca `running`, `completed` ou `failed` sem misturar logica de negocio dentro dos agentes.
+- `ai-agent-system/src/radar/api/app.py`
+  - `POST /runs` usa `BackgroundTasks`;
+  - resposta inicial: `{ run_id, status: "pending" }`;
+  - `GET /runs/{id}` agora retorna `steps` com status e timestamps.
+- `frontend/src/lib/api.ts`
+  - `RunDetail` passa a incluir `steps`;
+  - `API_BASE` agora pode ser configurado com `VITE_API_BASE_URL`, mantendo `http://localhost:8000` como padrao.
+- `frontend/src/routes/pipeline.tsx`
+  - a UI usa progresso real do backend;
+  - as etapas nao aparecem mais todas como `running` ao mesmo tempo;
+  - falhas de run mostram mensagem mais clara.
+- `frontend/src/components/pipeline-status.tsx`
+  - chave do RAG alinhada para `nvidia_rag`.
+- `ai-agent-system/src/radar/agents/nvidia_rag.py`
+  - estabilizada recuperacao de chunks explicitamente citados pelos hints, evitando flakiness em `NeMo Guardrails`.
+
+### Validacoes executadas
+
+```text
+pip check -> No broken requirements found.
+ruff check src/radar tests -> All checks passed.
+pytest tests/test_database.py tests/test_api_crud.py tests/test_graph_mvp.py -q -> 30 passed, 1 warning.
+pytest tests/test_recommendation_mapping.py -q -> 9 passed.
+pytest -x -q -> 156 passed, 2 warnings conhecidos.
+npm run build -> OK.
+alembic upgrade head -> OK, com PYTHONPATH apontando para src.
+```
+
+Warnings conhecidos:
+
+```text
+StarletteDeprecationWarning do TestClient.
+FutureWarning do pacote google.generativeai.
+```
+
+### Resultado para UX
+
+Novo fluxo esperado:
+
+```text
+Frontend POST /runs
+ -> backend cria run e steps pendentes
+ -> responde run_id rapidamente
+ -> BackgroundTasks executa LangGraph
+ -> cada node atualiza run_steps
+ -> frontend faz polling em GET /runs/{id}
+ -> usuario ve qual etapa esta rodando
+```
+
+Isso reduz a sensacao de tela travada e deixa claro se o gargalo esta em `scraper`, `extractor`, `classifier`, `nvidia_rag` ou outra etapa.

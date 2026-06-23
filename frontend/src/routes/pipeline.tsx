@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,20 +6,71 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useSubmitRun, useRun } from "@/lib/hooks/use-runs";
-import { PipelineStatus, type PipelineStepData } from "@/components/pipeline-status";
+import { PipelineStatus, type PipelineStepData, type StepStatus } from "@/components/pipeline-status";
 import { ApiErrorDisplay } from "@/components/api-error-display";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/pipeline")({
-  head: () => ({ meta: [{ title: "Pipeline Multiagente — NVIDIA Toph" }] }),
+  head: () => ({ meta: [{ title: "Pipeline Multiagente - NVIDIA Toph" }] }),
   component: PipelinePage,
 });
+
+const STEP_KEYS = [
+  "search_planner",
+  "scraper",
+  "extractor",
+  "validator",
+  "classifier",
+  "nvidia_rag",
+  "recommendation",
+  "briefing",
+];
 
 function formatDuration(start: number | null, end: number | null): string {
   if (!start) return "0s";
   const s = Math.floor(((end ?? Date.now()) - start) / 1000);
   const m = Math.floor(s / 60);
   return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+}
+
+function mapStepStatus(status: string | undefined): StepStatus {
+  if (status === "running") return "running";
+  if (status === "completed") return "done";
+  if (status === "failed") return "error";
+  return "idle";
+}
+
+function elapsedFromIso(startedAt: string | null, completedAt: string | null): number | undefined {
+  if (!startedAt) return undefined;
+  const start = Date.parse(startedAt);
+  if (Number.isNaN(start)) return undefined;
+  const end = completedAt ? Date.parse(completedAt) : Date.now();
+  if (Number.isNaN(end)) return undefined;
+  return Math.max(0, Math.floor((end - start) / 1000));
+}
+
+function emptySteps(activeFirstStep: boolean): PipelineStepData[] {
+  return STEP_KEYS.map((key, index) => ({
+    key,
+    status: activeFirstStep && index === 0 ? "running" : "idle",
+  }));
+}
+
+function buildStepData(runDetail: ReturnType<typeof useRun>["data"], isSubmitting: boolean): PipelineStepData[] {
+  if (!runDetail?.steps?.length) {
+    return emptySteps(isSubmitting);
+  }
+
+  const byKey = new Map(runDetail.steps.map((step) => [step.step_key, step]));
+  return STEP_KEYS.map((key) => {
+    const step = byKey.get(key);
+    return {
+      key,
+      status: mapStepStatus(step?.status),
+      elapsedSeconds: elapsedFromIso(step?.started_at ?? null, step?.completed_at ?? null),
+      errorMessage: step?.error_message ?? undefined,
+    };
+  });
 }
 
 function PipelinePage() {
@@ -32,13 +83,12 @@ function PipelinePage() {
   const { mutate: execute, isPending: isSubmitting, error: submitError } = useSubmitRun();
   const { data: runDetail, isLoading: isPolling, error: pollError } = useRun(runId);
 
-  const isRunning = isSubmitting || (runDetail?.status === "pending" || runDetail?.status === "running");
+  const isRunning = isSubmitting || runDetail?.status === "pending" || runDetail?.status === "running";
   const hasResult = runDetail?.status === "completed";
   const hasError = runDetail?.status === "failed";
 
-  // Tick timer while running
   useEffect(() => {
-    if (runDetail?.status === "pending" || runDetail?.status === "running") {
+    if (isRunning) {
       timerRef.current = setInterval(() => {
         setElapsed(Math.floor((Date.now() - (startedAt ?? Date.now())) / 1000));
       }, 1000);
@@ -46,26 +96,9 @@ function PipelinePage() {
       clearInterval(timerRef.current);
     }
     return () => clearInterval(timerRef.current);
-  }, [runDetail?.status, startedAt]);
+  }, [isRunning, startedAt]);
 
-  // Build step data from run state
-  const steps: PipelineStepData[] = [
-    { key: "search_planner", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "scraper", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "extractor", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "classifier", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "validator", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "rag", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "recommendation", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "briefing", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-  ];
-
-  if (hasError) {
-    steps.forEach((s) => {
-      if (s.status === "running") s.status = "error";
-    });
-  }
-
+  const steps = buildStepData(runDetail, isSubmitting || isPolling);
   const displayError = submitError ?? pollError ?? null;
 
   const handleSubmit = () => {
@@ -79,7 +112,7 @@ function PipelinePage() {
     execute(query.trim(), {
       onSuccess: (res) => {
         setRunId(res.run_id);
-        toast.success("Pipeline iniciado!");
+        toast.success("Pipeline iniciado. Acompanhando progresso em tempo real.");
       },
       onError: (err: unknown) => {
         const msg = err && typeof err === "object" && "message" in err
@@ -95,18 +128,17 @@ function PipelinePage() {
       <div>
         <h1 className="text-lg font-semibold text-foreground">Pipeline Multiagente</h1>
         <p className="text-xs text-muted-foreground">
-          Executa o fluxo completo: busca, coleta, extração, classificação, validação, RAG NVIDIA, recomendação e briefing.
+          Executa busca, coleta, extracao, validacao, classificacao, RAG NVIDIA, recomendacao e briefing.
         </p>
       </div>
 
-      {/* Search input */}
       <Card className="p-4">
         <div className="flex flex-col gap-3 sm:flex-row">
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            placeholder='Ex: "startups brasileiras de IA para saúde", "agentes LLM em fintechs"…'
+            placeholder='Ex: "startups brasileiras de IA para saude", "agentes LLM em fintechs"...'
             className="h-10 flex-1"
             disabled={isRunning}
           />
@@ -125,7 +157,6 @@ function PipelinePage() {
         </div>
       </Card>
 
-      {/* Pipeline status */}
       {(isRunning || hasResult || hasError) && (
         <Card className="p-4">
           <PipelineStatus
@@ -136,7 +167,6 @@ function PipelinePage() {
         </Card>
       )}
 
-      {/* Error display */}
       {displayError && !isRunning && (
         <ApiErrorDisplay
           error={
@@ -148,15 +178,22 @@ function PipelinePage() {
         />
       )}
 
-      {/* Results */}
+      {hasError && !displayError && (
+        <Card className="p-4">
+          <p className="text-sm text-destructive">
+            Pipeline falhou. Veja a etapa marcada em vermelho ou os logs do backend para o detalhe completo.
+          </p>
+        </Card>
+      )}
+
       {hasResult && runDetail && (
         <div className="space-y-4">
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-foreground">Pipeline concluído</h2>
+                <h2 className="text-sm font-semibold text-foreground">Pipeline concluido</h2>
                 <p className="text-xs text-muted-foreground">
-                  Consulta: "{runDetail.query}" · Duração: {formatDuration(startedAt, Date.now())}
+                  Consulta: "{runDetail.query}" - Duracao: {formatDuration(startedAt, Date.now())}
                 </p>
               </div>
               <Badge variant="outline" className="gap-1.5 border-green-500/30 bg-green-500/10 text-green-600">
@@ -165,11 +202,10 @@ function PipelinePage() {
             </div>
           </Card>
 
-          {/* Recommendations */}
           {runDetail.recommendations.length > 0 && (
             <Card className="p-4">
               <h3 className="mb-3 text-sm font-semibold text-foreground">
-                Recomendações NVIDIA ({runDetail.recommendations.length})
+                Recomendacoes NVIDIA ({runDetail.recommendations.length})
               </h3>
               <div className="space-y-2">
                 {runDetail.recommendations.map((r) => (
@@ -187,13 +223,13 @@ function PipelinePage() {
                       <span className="font-medium">Gap alvo:</span> {r.target_gap}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      <span className="font-medium">Técnico:</span> {r.technical_justification}
+                      <span className="font-medium">Tecnico:</span> {r.technical_justification}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      <span className="font-medium">Negócio:</span> {r.business_justification}
+                      <span className="font-medium">Negocio:</span> {r.business_justification}
                     </p>
                     <p className="mt-1 text-[11px] text-primary">
-                      Próxima ação: {r.suggested_next_action}
+                      Proxima acao: {r.suggested_next_action}
                     </p>
                   </div>
                 ))}
@@ -201,11 +237,10 @@ function PipelinePage() {
             </Card>
           )}
 
-          {/* No results */}
           {runDetail.recommendations.length === 0 && (
             <Card className="p-4">
               <p className="text-sm text-muted-foreground">
-                Pipeline executou mas não gerou recomendações. Verifique a consulta ou os logs do backend.
+                Pipeline executou mas nao gerou recomendacoes. Verifique evidencia minima, classificacao e logs do backend.
               </p>
             </Card>
           )}
@@ -218,16 +253,15 @@ function PipelinePage() {
         </div>
       )}
 
-      {/* Rules card (always visible) */}
       <Card className="p-4">
         <h3 className="mb-2 text-sm font-semibold text-foreground">Regras do pipeline</h3>
         <ul className="grid gap-1.5 text-xs text-foreground sm:grid-cols-2">
-          <li>• Coleta restrita a informações públicas, respeitando robots.txt.</li>
-          <li>• URL e trecho original sempre preservados como evidência.</li>
-          <li>• Classificação AI-Native / AI-Enabled / Non-AI com critérios explícitos.</li>
-          <li>• Recomendação NVIDIA exige ao menos uma evidência validada.</li>
-          <li>• Base NVIDIA consultada via RAG antes de toda recomendação.</li>
-          <li>• Briefing executivo agrega justificativa técnica e de negócio.</li>
+          <li>- Coleta restrita a informacoes publicas, respeitando robots.txt.</li>
+          <li>- URL e trecho original sempre preservados como evidencia.</li>
+          <li>- Classificacao AI-Native / AI-Enabled / Non-AI com criterios explicitos.</li>
+          <li>- Recomendacao NVIDIA exige evidencia validada.</li>
+          <li>- Base NVIDIA consultada via RAG antes de toda recomendacao.</li>
+          <li>- Briefing executivo agrega justificativa tecnica e de negocio.</li>
         </ul>
       </Card>
     </div>

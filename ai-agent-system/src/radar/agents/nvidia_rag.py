@@ -1,9 +1,10 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import unicodedata
 from typing import Any, cast, get_args
 
 from radar.graph.state import RadarState
+from radar.rag.knowledge_base import get_seed_chunks
 from radar.rag.retriever import ensure_seeded, retrieve
 from radar.schemas import NvidiaKnowledgeChunk
 from radar.schemas.recommendation import NvidiaTechnology
@@ -17,7 +18,17 @@ QUERY_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
         "healthcare medical clinical NVIDIA Clara",
     ),
     (
-        ("voz", "voice", "speech", "audio", "transcricao", "asr", "tts", "call center", "atendimento"),
+        (
+            "voz",
+            "voice",
+            "speech",
+            "audio",
+            "transcricao",
+            "asr",
+            "tts",
+            "call center",
+            "atendimento",
+        ),
         "voice speech ASR TTS transcription NVIDIA Riva",
     ),
     (
@@ -88,7 +99,7 @@ def retrieve_nvidia_context(state: RadarState) -> list[NvidiaKnowledgeChunk]:
         return []
 
     ensure_seeded()
-    results = retrieve(query, top_k=5)
+    results = retrieve(query, top_k=8)
 
     chunks: list[NvidiaKnowledgeChunk] = []
     for result in results:
@@ -111,7 +122,33 @@ def retrieve_nvidia_context(state: RadarState) -> list[NvidiaKnowledgeChunk]:
             )
         )
 
-    return chunks
+    return _append_explicit_technology_chunks(chunks, query)
+
+
+def _append_explicit_technology_chunks(
+    chunks: list[NvidiaKnowledgeChunk], query: str
+) -> list[NvidiaKnowledgeChunk]:
+    existing = {chunk.technology for chunk in chunks}
+    augmented = list(chunks)
+    normalized_query = query.lower()
+    for seed in get_seed_chunks():
+        technology = _as_nvidia_technology(seed.get("technology"))
+        if technology is None or technology in existing:
+            continue
+        if str(technology).lower() not in normalized_query:
+            continue
+        augmented.append(
+            NvidiaKnowledgeChunk(
+                id=str(seed.get("id", "")),
+                technology=technology,
+                title=_as_text(seed.get("title")),
+                url=_as_text(seed.get("url")),
+                content=_as_text(seed.get("content")),
+                relevance_score=1.0,
+            )
+        )
+        existing.add(technology)
+    return augmented
 
 
 def _build_query_hints(text: str) -> list[str]:
