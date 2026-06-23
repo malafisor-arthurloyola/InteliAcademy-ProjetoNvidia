@@ -9,6 +9,7 @@ from radar.schemas import PipelineError, SearchPlan
 from radar.scraping.adapters import (
     HtmlPageContentAdapter,
     PageContentAdapter,
+    _infer_source_type_from_url,
     SerpApiSearchAdapter,
 )
 from radar.graph.nodes import scraper_node
@@ -161,6 +162,26 @@ def test_scraper_node_records_collection_errors(
     assert update["collection_attempts"] == 1
     assert update["review_required"] is True
     assert update["errors"][0].source_url == "https://example.com/missing"
+
+
+def test_infer_source_type_marks_query_domain_as_official_site() -> None:
+    assert (
+        _infer_source_type_from_url(
+            "https://www.gupy.io/software-de-recrutamento-e-selecao",
+            query_terms=["gupy"],
+        )
+        == "official_site"
+    )
+
+
+def test_infer_source_type_does_not_promote_generic_vendor_pages() -> None:
+    assert (
+        _infer_source_type_from_url(
+            "https://www.capterra.ca/software/192196/gupy",
+            query_terms=["gupy"],
+        )
+        == "other"
+    )
 
 
 def _search_plan() -> SearchPlan:

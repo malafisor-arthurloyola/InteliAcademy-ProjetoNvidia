@@ -1,6 +1,7 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
+import time
 
 import pytest
 from starlette.testclient import TestClient
@@ -20,6 +21,19 @@ def _clean_db() -> None:
     yield
     if db_path.exists():
         db_path.unlink()
+
+
+def _wait_for_run(client: TestClient, run_id: int, timeout_seconds: float = 10.0) -> dict:
+    deadline = time.monotonic() + timeout_seconds
+    payload: dict = {}
+    while time.monotonic() < deadline:
+        response = client.get(f"/runs/{run_id}")
+        assert response.status_code == 200
+        payload = response.json()
+        if payload["status"] in {"completed", "failed"}:
+            return payload
+        time.sleep(0.05)
+    return payload
 
 
 def test_health_endpoint() -> None:
@@ -107,6 +121,7 @@ def test_run_analysis_with_fixture_succeeds() -> None:
     data = response.json()
     assert "run_id" in data
     assert data["status"] in {"pending", "running", "completed"}
+    assert _wait_for_run(client, data["run_id"])["status"] == "completed"
 
 
 def test_run_analysis_can_be_queried_afterwards() -> None:
@@ -114,10 +129,8 @@ def test_run_analysis_can_be_queried_afterwards() -> None:
     post_resp = client.post("/runs", json={"query": "startup brasileira de IA"})
     run_id = post_resp.json()["run_id"]
 
-    get_resp = client.get(f"/runs/{run_id}")
-    assert get_resp.status_code == 200
-    assert get_resp.json()["query"] == "startup brasileira de IA"
-    payload = get_resp.json()
+    payload = _wait_for_run(client, run_id)
+    assert payload["query"] == "startup brasileira de IA"
     assert payload["status"] == "completed"
     assert len(payload["steps"]) == 8
     assert payload["steps"][0]["step_key"] == "search_planner"
@@ -127,6 +140,8 @@ def test_run_analysis_exposes_sources_and_claims_afterwards() -> None:
     client = TestClient(app)
     post_resp = client.post("/runs", json={"query": "startup brasileira de IA"})
     run_id = post_resp.json()["run_id"]
+
+    _wait_for_run(client, run_id)
 
     sources_resp = client.get(f"/runs/{run_id}/sources")
     claims_resp = client.get(f"/runs/{run_id}/claims")

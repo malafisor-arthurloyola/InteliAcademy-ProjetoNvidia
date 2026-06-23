@@ -1617,3 +1617,65 @@ Frontend POST /runs
 ```
 
 Isso reduz a sensacao de tela travada e deixa claro se o gargalo esta em `scraper`, `extractor`, `classifier`, `nvidia_rag` ou outra etapa.
+---
+
+## 2026-06-23 (Diagnostico real Gupy + UX backend)
+
+### Problema observado
+
+Ao pesquisar `gupy` no frontend, o usuario nao via progresso claro e o resultado vinha sem recomendacoes. O diagnostico foi feito primeiro pelo backend, sem depender do frontend.
+
+### O que foi encontrado
+
+- A porta `8000` estava respondendo com um servidor antigo/global, iniciado por Python fora do venv, o que contrariava a regra do projeto.
+- `POST /runs` podia demorar dezenas de segundos antes de devolver `run_id`, impedindo a UI de mostrar progresso imediatamente.
+- O import inicial da API carregava o grafo/RAG cedo demais e demorava cerca de 39s.
+- Fontes oficiais como `www.gupy.io` e `portal.gupy.io` eram classificadas como `source_type=other`, reduzindo confidence para `0.3` e bloqueando classifier/RAG/recommendation no primeiro teste.
+- As claims usavam os primeiros 500 caracteres da pagina, muitas vezes menu/nav, e nao o trecho real onde aparecia `Agentes de IA`.
+
+### Correcoes aplicadas
+
+- `src/radar/api/app.py`
+  - trocou `BackgroundTasks` por `ThreadPoolExecutor`, para `POST /runs` retornar rapido;
+  - moveu o import de `build_graph` para dentro da execucao do pipeline;
+  - marca o run como `running` antes do import pesado do grafo.
+- `src/radar/scraping/adapters.py`
+  - Firecrawl agora usa termos da query para reconhecer dominio oficial da empresa;
+  - dominios genericos como Capterra/Google Play nao sao promovidos para `official_site`.
+- `src/radar/agents/extractor.py`
+  - claims agora salvam snippet focado no marcador de IA/tecnologia, nao apenas o inicio bruto da pagina;
+  - deteccao de `AI/IA` usa fronteira de palavra para evitar falso positivo por substring.
+- Testes atualizados em:
+  - `tests/test_api_crud.py`
+  - `tests/test_scraping_adapters.py`
+  - `tests/test_extractor.py`
+
+### Resultado do teste real com Gupy
+
+Instancia limpa em `http://127.0.0.1:8001` usando Python do venv:
+
+```text
+POST /runs query=gupy -> 0.09s, status pending
+Polling -> search_planner -> scraper -> extractor -> validator -> classifier -> nvidia_rag -> recommendation -> briefing
+Resultado final -> completed, 3 recommendations
+```
+
+Recomendacoes reais geradas:
+
+```text
+- NeMo Guardrails
+- NVIDIA AI Enterprise
+- NVIDIA Triton Inference Server
+```
+
+### Validacoes executadas
+
+```text
+ruff check src/radar/api/app.py src/radar/scraping/adapters.py src/radar/agents/extractor.py tests/test_api_crud.py tests/test_scraping_adapters.py tests/test_extractor.py -> All checks passed.
+pytest tests/test_api_crud.py tests/test_scraping_adapters.py tests/test_extractor.py tests/test_evidence_pipeline.py tests/test_rag_pipeline.py tests/test_recommendation_mapping.py -q -> 64 passed, 1 warning conhecido.
+pip check -> No broken requirements found.
+```
+
+### Observacao operacional
+
+A porta `8000` ainda precisa ser limpa/reiniciada no ambiente Windows do usuario, pois apareceu presa a processos antigos/inconsistentes. Para diagnostico confiavel, foi usada a porta `8001` com o Python absoluto do venv.

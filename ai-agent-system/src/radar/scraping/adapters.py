@@ -187,7 +187,10 @@ class FirecrawlSearchAdapter:
                 "url": item.url,
                 "title": item.title or "",
                 "description": item.description or "",
-                "source_type": _infer_source_type_from_url(item.url),
+                "source_type": _infer_source_type_from_url(
+                    item.url,
+                    query_terms=plan.keywords or [plan.query],
+                ),
                 "rank": len(candidates) + 1,
             })
         for item in (response.news or []):
@@ -300,8 +303,13 @@ def _ensure_api_key(api_key: str | None, provider: str) -> None:
         )
 
 
-def _infer_source_type_from_url(url: str) -> str:
+def _infer_source_type_from_url(
+    url: str,
+    *,
+    query_terms: Sequence[str] | None = None,
+) -> str:
     url_lower = url.lower()
+    host = _host_from_url(url_lower)
     if any(d in url_lower for d in ("crunchbase", "pitchbook", "startupbase", "distrito")):
         return "startup_directory"
     if any(d in url_lower for d in ("linkedin", "glassdoor")):
@@ -314,4 +322,34 @@ def _infer_source_type_from_url(url: str) -> str:
         return "blog"
     if any(j in url_lower for j in ("/sobre", "/about", "/quem-somos")):
         return "official_site"
+    if _host_matches_query(host, query_terms):
+        return "official_site"
     return "other"
+
+
+def _host_from_url(url: str) -> str:
+    from urllib.parse import urlparse
+
+    return urlparse(url).netloc.lower()
+
+
+def _host_matches_query(host: str, query_terms: Sequence[str] | None) -> bool:
+    if not host or not query_terms:
+        return False
+    generic_hosts = (
+        "google.",
+        "apple.",
+        "capterra.",
+        "getapp.",
+        "linkedin.",
+        "crunchbase.",
+        "pitchbook.",
+    )
+    if any(generic in host for generic in generic_hosts):
+        return False
+    normalized_host = host.removeprefix("www.")
+    for term in query_terms:
+        normalized_term = "".join(ch for ch in term.lower() if ch.isalnum())
+        if len(normalized_term) >= 3 and normalized_term in normalized_host:
+            return True
+    return False

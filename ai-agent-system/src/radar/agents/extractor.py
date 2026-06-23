@@ -61,7 +61,13 @@ TECHNOLOGY_KEYWORDS: list[tuple[Pattern[str], str]] = [
     (re.compile(r"gpu|inferencia|inference\s+(?:serv|optim)", re.IGNORECASE), "GPU Inference"),
 ]
 
-AI_MARKERS = ("ai", "ia", "llm", "machine learning", "agents", "automation")
+AI_MARKER_PATTERNS: list[Pattern[str]] = [
+    re.compile(r"\b(?:ai|ia)\b", re.IGNORECASE),
+    re.compile(r"artificial intelligence|inteligencia artificial", re.IGNORECASE),
+    re.compile(r"machine learning|\bllms?\b", re.IGNORECASE),
+    re.compile(r"\bagents?\b|\bagentes?\b", re.IGNORECASE),
+    re.compile(r"automation|automacao|automatizacao", re.IGNORECASE),
+]
 TECH_MARKERS = ("pipeline", "production", "evaluation", "workflow", "data")
 
 
@@ -78,7 +84,7 @@ def extract_startups_and_claims(state: RadarState) -> tuple[list[StartupProfile]
         claims.append(
             EvidenceClaim(
                 source_document_id=source.id,
-                text=source.text[:500],
+                text=_extract_claim_snippet(source.text, claim_type),
                 claim_type=claim_type,
                 confidence=confidence,
             )
@@ -220,11 +226,44 @@ def _extract_technologies(text: str) -> list[str]:
 
 def _infer_claim_type(text: str) -> str:
     normalized_text = text.lower()
-    if any(marker in normalized_text for marker in AI_MARKERS):
+    if _find_first_pattern_match(text, AI_MARKER_PATTERNS):
         return "ai_usage"
     if any(marker in normalized_text for marker in TECH_MARKERS):
         return "technology_signal"
     return "public_signal"
+
+
+def _extract_claim_snippet(text: str, claim_type: str) -> str:
+    match = None
+    if claim_type == "ai_usage":
+        match = _find_first_pattern_match(text, AI_MARKER_PATTERNS)
+    elif claim_type == "technology_signal":
+        normalized_text = text.lower()
+        marker_indexes = [
+            normalized_text.find(marker)
+            for marker in TECH_MARKERS
+            if normalized_text.find(marker) >= 0
+        ]
+        if marker_indexes:
+            start_index = min(marker_indexes)
+            return _slice_around_index(text, start_index)
+    if match:
+        return _slice_around_index(text, match.start())
+    return text[:500].strip()
+
+
+def _find_first_pattern_match(text: str, patterns: list[Pattern[str]]) -> re.Match[str] | None:
+    matches = [match for pattern in patterns if (match := pattern.search(text))]
+    if not matches:
+        return None
+    return min(matches, key=lambda match: match.start())
+
+
+def _slice_around_index(text: str, index: int, window: int = 500) -> str:
+    before = window // 2
+    start = max(0, index - before)
+    end = min(len(text), start + window)
+    return text[start:end].strip()
 
 
 def _infer_claim_confidence(source_type: str, claim_type: str) -> float:

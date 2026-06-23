@@ -93,21 +93,24 @@ Fase 4b: Frontend dashboard completo com API real.                     ✅
 Resumo atual:
 
 ```text
-Branches feat/backend-scores e feat/frontend-pages mergedados em main com zero conflito.
-Todas as 7 paginas do frontend consumindo API real.
-Profile permanece mock (baixa prioridade).
-Proximo foco: Fase 5 — persistencia SQLite completa + deploy.
+Backend diagnosticado com query real `gupy`.
+`POST /runs` corrigido para devolver run_id rapido via ThreadPoolExecutor.
+Import pesado do LangGraph/RAG adiado para dentro da execucao do pipeline.
+Firecrawl agora reconhece dominios oficiais pela query, preservando Capterra/Google Play como fonte generica.
+Extractor agora salva claims com snippet focado no marcador de IA/tecnologia.
+Teste real em 127.0.0.1:8001: Gupy completou pipeline e gerou 3 recomendacoes (NeMo Guardrails, NVIDIA AI Enterprise, Triton).
+A porta 8000 ainda precisa ser limpa no Windows; havia processo antigo/global fora do venv respondendo.
 ```
 
 Ultima atualizacao:
 
 ```text
-2026-06-22 - Todas as fases 1-5 concluidas. Sistema funcional end-to-end.
+2026-06-23 - Codex corrigiu UX backend/progresso e recomendacoes reais para Gupy; validacoes focadas ok.
 ```
 Proxima verificacao sugerida:
 
 ```text
-Quando Codex ou Opencode iniciar uma tarefa nova, atualizar esta secao com o que esta em andamento.
+Limpar/reiniciar backend em 8000 com Python do venv ou apontar frontend temporariamente para VITE_API_BASE_URL=http://127.0.0.1:8001 para smoke test visual.
 ```
 
 ## Acao necessaria do usuario
@@ -166,12 +169,12 @@ Data:
 
 ## Tarefa em andamento
 
-Status: concluido por Codex.
+Status: concluido por Codex em 2026-06-23.
 
 Objetivo atual:
 
 ```text
-Branch feat/frontend-pages: Startup Detail, Briefing e Contacts migradas para API real; Profile permanece mock; sem backend nesta branch.
+Diagnosticar backend real com query `gupy`, corrigir feedback de progresso e desbloquear recomendacoes reais sem depender do frontend.
 ```
 ## Arquivos reservados
 
@@ -334,3 +337,4 @@ cd ai-agent-system
 - 2026-06-20: skill `firecrawl-skill` criada, README atualizado com setup de env/API keys/safety switch, Relatorio de Progresso atualizado, Handoff atualizado, .env.example atualizado com firecrawl provider options, Obsidian note "Firecrawl Setup.md" criada.
 - 2026-06-20: PlaywrightPageAdapter implementado (Chromium headless + trafilatura). `settings.py`, `provider_factory.py`, `provider_preflight.py` atualizados. 9 novos testes. pytest 77 passed, ruff ok.
 - 2026-06-20: LLM adapter system implementado (Groq primario + OpenAI/Gemini fallback). `src/radar/llm/` criado com adapters e prompts. Extractor e Classifier com LLM + fallback deterministico. 15 novos testes. pytest 92 passed, ruff ok. Handoff, Relatorio, README, Obsidian atualizados.
+- 2026-06-23: Codex diagnosticou `gupy` pelo backend: fonte oficial estava como `other`, claims pegavam menu/nav e POST bloqueava UX. Corrigido com ThreadPoolExecutor, lazy import do grafo, inferencia de dominio oficial e snippets focados. Teste real em 8001 gerou 3 recomendacoes.

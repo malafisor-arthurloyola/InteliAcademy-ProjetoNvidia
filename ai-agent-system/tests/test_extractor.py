@@ -111,6 +111,17 @@ def test_extractor_collects_ai_claims_across_multiple_sources() -> None:
     assert len(ai_claims) >= 2
 
 
+def test_extractor_claim_snippet_focuses_on_ai_marker() -> None:
+    text = ("Menu institucional. " * 80) + "Recrute com Agentes de IA para acelerar contratacoes."
+    sources = [_source(text, "Gupy", source_type="official_site")]
+
+    _, claims = extract_startups_and_claims({"query": "Gupy", "sources": sources})
+
+    assert claims[0].claim_type == "ai_usage"
+    assert "Agentes de IA" in claims[0].text
+    assert not claims[0].text.startswith("Menu institucional. Menu institucional.")
+
+
 def test_llm_extractor_uses_extracted_startup_name(monkeypatch) -> None:
     from radar.agents import extractor as extractor_module
 

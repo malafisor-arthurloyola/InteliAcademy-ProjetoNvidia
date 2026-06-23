@@ -1,7 +1,8 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 from collections.abc import AsyncGenerator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
@@ -9,7 +10,7 @@ from typing import Any
 
 from alembic import command as alembic_command
 from alembic.config import Config as AlembicConfig
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -37,12 +38,12 @@ from radar.database import (
     update_run_step_status,
 )
 from radar.database.connection import get_db_path
-from radar.graph.builder import build_graph
 from radar.scraping.provider_preflight import inspect_provider_setup
 
 
 _DB_DIR = Path(__file__).resolve().parent.parent / "database"
 _ALEMBIC_INI = _DB_DIR / "alembic.ini"
+_PIPELINE_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="radar-pipeline")
 
 
 @asynccontextmanager
@@ -126,6 +127,8 @@ def _record_step_progress(
 
 def _execute_run_pipeline(run_id: int, query: str) -> None:
     update_run_status(run_id, "running")
+
+    from radar.graph.builder import build_graph
     try:
         graph = build_graph(
             progress_callback=lambda step_key, status, error_message=None: _record_step_progress(
@@ -188,13 +191,13 @@ def provider_preflight() -> dict[str, object]:
 
 
 @app.post("/runs")
-def run_analysis(payload: RunRequest, background_tasks: BackgroundTasks) -> dict[str, Any]:
+def run_analysis(payload: RunRequest) -> dict[str, Any]:
     query = payload.query.strip()
     if not query:
         raise HTTPException(status_code=400, detail="query must not be empty")
 
     run_id = save_run(query)
-    background_tasks.add_task(_execute_run_pipeline, run_id, query)
+    _PIPELINE_EXECUTOR.submit(_execute_run_pipeline, run_id, query)
     return jsonable_encoder({"run_id": run_id, "status": "pending"})
 
 
