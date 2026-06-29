@@ -33,6 +33,11 @@ frontend/node_modules/
 frontend/dist/
 frontend/.env
 
+# Duplicate frontend (created by mistake)
+ai-agent-system/frontend/
+ai-agent-system/frontend/node_modules/
+ai-agent-system/frontend/dist/
+
 # OS/editor
 .DS_Store
 Thumbs.db
