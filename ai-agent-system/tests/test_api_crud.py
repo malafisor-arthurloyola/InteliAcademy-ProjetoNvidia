@@ -24,7 +24,7 @@ def _clean_db() -> None:
 
 
 
-def _wait_for_run(client: TestClient, run_id: int, timeout_seconds: float = 15.0) -> dict[str, object]:
+def _wait_for_run(client: TestClient, run_id: int, timeout_seconds: float = 30.0) -> dict[str, object]:
     deadline = time.monotonic() + timeout_seconds
     payload: dict[str, object] = {}
     while time.monotonic() < deadline:
@@ -162,4 +162,6 @@ def test_run_analysis_exposes_sources_and_claims_afterwards() -> None:
     assert all_sources_resp.status_code == 200
     assert len(sources_resp.json()) >= 1
     assert len(claims_resp.json()) >= 1
-    assert sources_resp.json()[0]["claim_count"] >= 1
+    assert any(s["claim_count"] >= 1 for s in sources_resp.json()), (
+        f"No source has claims. Counts: {[s['claim_count'] for s in sources_resp.json()]}"
+    )

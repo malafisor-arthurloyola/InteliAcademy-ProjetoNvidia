@@ -137,3 +137,12 @@ def test_llm_extractor_uses_extracted_startup_name(monkeypatch) -> None:
 
     assert startups[0].name == "Voa Health"
     assert startups[0].sector == "Healthcare"
+
+def test_extract_technologies_does_not_match_riva_as_substring() -> None:
+    from radar.agents.extractor import _extract_technologies
+
+    technologies = _extract_technologies(
+        "The platform uses private data and enterprise innovation workflows."
+    )
+
+    assert "Riva" not in technologies

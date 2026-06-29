@@ -69,7 +69,7 @@ function BriefingPage() {
     return (
       <div className="mx-auto w-full max-w-5xl p-4 md:p-6">
         <ApiErrorDisplay
-          error={error as ApiError}
+          error={error as unknown as ApiError}
           onRetry={() => {
             void healthQuery.refetch();
             void startupsQuery.refetch();

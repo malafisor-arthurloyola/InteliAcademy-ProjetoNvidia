@@ -250,3 +250,44 @@ def _search_plan() -> SearchPlan:
         collection_plan=["fixture search", "fixture page extraction"],
     )
 
+
+
+def test_filter_relevant_candidates_reduces_ambiguous_traction_noise() -> None:
+    plan = SearchPlan(
+        query="traction",
+        keywords=["traction", "traction startup Brasil", "traction AI"],
+        source_types=["official_site", "blog"],
+        collection_plan=[],
+    )
+    candidates = [
+        SourceCandidate(
+            url="https://www.traction.com/en/",
+            domain="www.traction.com",
+            source_type="official_site",
+            title="Traction.com | Heavy duty truck parts - Traction",
+            snippet="Heavy duty truck parts catalog.",
+            provider="fixture",
+        ),
+        SourceCandidate(
+            url="https://tractian.com/blog/categorias/inteligencia-artificial",
+            domain="tractian.com",
+            source_type="blog",
+            title="Inteligencia Artificial - Categoria",
+            snippet="Posts da Tractian sobre IA industrial.",
+            provider="fixture",
+        ),
+        SourceCandidate(
+            url="https://www.tractiontechnology.com/traction-ai",
+            domain="www.tractiontechnology.com",
+            source_type="official_site",
+            title="Traction AI - Innovation Intelligence",
+            snippet="AI platform for technology scouting.",
+            provider="fixture",
+        ),
+    ]
+
+    filtered = _filter_relevant_candidates(candidates, plan)
+
+    assert [candidate.domain for candidate in filtered] == [
+        "www.tractiontechnology.com",
+    ]

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 import threading
+import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import asdict
@@ -13,6 +15,7 @@ from alembic import command as alembic_command
 from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from radar.database import (
@@ -96,6 +99,7 @@ app.add_middleware(
 
 class RunRequest(BaseModel):
     query: str
+    startup_name: str | None = None
 
 
 def _persist_run_result(run_id: int, result: dict[str, Any]) -> None:  # noqa: C901
@@ -200,21 +204,22 @@ def run_analysis(payload: RunRequest) -> dict[str, Any]:
 
     threading.Thread(
         target=_run_pipeline_background,
-        args=(run_id, query, tracker),
+        args=(run_id, query, tracker, payload.startup_name),
         daemon=True,
     ).start()
 
     return jsonable_encoder({"run_id": run_id, "status": "pending"})
 
 
-def _run_pipeline_background(run_id: int, query: str, tracker: PipelineTracker) -> None:
+def _run_pipeline_background(run_id: int, query: str, tracker: PipelineTracker, startup_name: str | None = None) -> None:
     update_run_status(run_id, "running")
     set_tracker(tracker)
     try:
         graph = build_graph()
-        result: dict[str, Any] = graph.invoke(
-            {"query": query, "collection_attempts": 0}
-        )
+        initial_state: dict[str, Any] = {"query": query, "collection_attempts": 0}
+        if startup_name:
+            initial_state["startup_name"] = startup_name
+        result: dict[str, Any] = graph.invoke(initial_state)
         _persist_run_result(run_id, result)
     except Exception as exc:
         import logging
@@ -257,6 +262,35 @@ def get_run(run_id: int) -> dict[str, Any]:
     run["steps"] = get_run_steps(run_id)
     run["validation"] = get_run_validation(run_id)
     return run
+
+
+@app.get("/runs/{run_id}/stream")
+def stream_pipeline(run_id: int):
+    if not get_run_by_id(run_id):
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    def event_stream():
+        last_data: Any = None
+        while True:
+            steps = get_run_steps(run_id)
+            if steps != last_data:
+                last_data = steps
+                yield f"data: {json.dumps(steps)}\n\n"
+            statuses = {s["status"] for s in steps}
+            if statuses == {"completed"} or ("error" in statuses and not statuses - {"completed", "error"}):
+                yield "event: done\ndata: {}\n\n"
+                break
+            time.sleep(0.5)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.get("/startups")

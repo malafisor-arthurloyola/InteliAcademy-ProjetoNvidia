@@ -95,7 +95,6 @@ export interface ValidationRecord {
   requires_human_review: boolean;
 }
 
-
 export interface RunDetail {
   id: number;
   query: string;
@@ -122,6 +121,9 @@ export interface StartupRecord {
   classification_label: string | null;
   classification_confidence: number | null;
   classification_rationale: string | null;
+  radar_score?: number;
+  evidence_count?: number;
+  recommendation_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -147,6 +149,11 @@ export interface EvidenceClaimRecord {
   text: string;
   claim_type: string;
   confidence: number;
+}
+
+export interface SubmitRunPayload {
+  query: string;
+  startupName?: string;
 }
 
 export interface SubmitRunResponse {
@@ -190,10 +197,15 @@ export function fetchRunClaims(id: number): Promise<EvidenceClaimRecord[]> {
   return request<EvidenceClaimRecord[]>(`/runs/${id}/claims`);
 }
 
-export function submitRun(query: string): Promise<SubmitRunResponse> {
+export function submitRun(
+  payload: SubmitRunPayload,
+): Promise<SubmitRunResponse> {
+  const startupName = payload.startupName?.trim();
   return request<SubmitRunResponse>("/runs", {
     method: "POST",
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({
+      query: payload.query,
+      ...(startupName ? { startup_name: startupName } : {}),
+    }),
   });
 }
-

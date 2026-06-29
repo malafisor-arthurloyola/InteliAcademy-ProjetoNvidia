@@ -102,7 +102,7 @@ Profile permanece mock (baixa prioridade); producao ainda pede worker/fila e Pos
 Ultima atualizacao:
 
 ```text
-2026-06-29 - Codex corrigiu UX de bloqueio sem recomendacoes, expos validacao no detalhe do run, melhorou inferencia de fonte oficial e validou ruff/pip check/pytest/build.
+2026-06-29 - Codex preservou detalhes dos steps, alinhou ordem da pipeline, adicionou guardrails de desambiguacao/recomendacao, integrou startup_name no frontend real e validou pip check, ruff, pytest 165, tsc, ESLint especifico e build.
 ```
 Proxima verificacao sugerida:
 
@@ -168,6 +168,26 @@ Data:
 
 Status: concluido por Codex.`r`n`r`nObjetivo atual:`r`n`r`n```text`r`nDiagnosticar coleta real/UX de bloqueio e preparar proxima fase de Discovery em lote.`r`n```
 ## Arquivos reservados
+
+Agente: Codex
+Arquivos:
+- ai-agent-system/docs/agent-collaboration-board.md
+- ai-agent-system/src/radar/graph/progress.py
+- ai-agent-system/src/radar/graph/builder.py
+- ai-agent-system/src/radar/scraping/collectors.py
+- ai-agent-system/src/radar/agents/extractor.py
+- ai-agent-system/src/radar/agents/classifier.py
+- ai-agent-system/src/radar/agents/recommendation.py
+- frontend/src/lib/api.ts
+- frontend/src/lib/hooks/use-runs.ts
+- frontend/src/routes/pipeline.tsx
+- Documents/Relatorio de Progresso.md
+Motivo:
+- Melhorar visibilidade da pipeline, desambiguacao de fontes, consistencia de classificacao/recomendacao e integrar startup_name opcional no frontend real.
+Inicio:
+- 2026-06-29 21:30
+Fim:
+- 2026-06-29 22:30
 
 Agente: Codex
 Arquivos:

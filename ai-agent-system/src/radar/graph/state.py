@@ -19,6 +19,7 @@ from radar.schemas import (
 
 class RadarState(TypedDict, total=False):
     query: str
+    startup_name: str
     search_plan: SearchPlan
     sources: list[SourceDocument]
     extracted_startups: list[StartupProfile]

@@ -184,7 +184,8 @@ class FirecrawlSearchAdapter:
         candidates = []
         seen_urls: set[str] = set()
         search_queries = _search_queries_for_plan(plan)
-        per_query_limit = max(3, 10 // len(search_queries))
+        search_queries = _prioritize_ia_queries(search_queries)
+        per_query_limit = max(5, 15 // len(search_queries))
 
         for search_query in search_queries:
             response = client.search(query=search_query, limit=per_query_limit)
@@ -312,6 +313,13 @@ def _ensure_api_key(api_key: str | None, provider: str) -> None:
         raise ExternalProviderCredentialsError(
             f"{provider} is enabled but no API key was configured."
         )
+
+
+def _prioritize_ia_queries(queries: list[str]) -> list[str]:
+    ia_keywords = (" IA", " inteligência", " artificial", " artificial intelligence", " AI")
+    ia_queries = [q for q in queries if any(k in q for k in ia_keywords)]
+    other_queries = [q for q in queries if q not in ia_queries]
+    return ia_queries + other_queries
 
 
 def _search_queries_for_plan(plan: SearchPlan, max_queries: int = 3) -> list[str]:

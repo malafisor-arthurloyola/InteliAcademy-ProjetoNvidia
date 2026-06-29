@@ -1623,3 +1623,153 @@ pytest -x -q -> 159 passed, 2 warnings conhecidos.
 4. Mostrar na Overview empresas descobertas/analisadas automaticamente, para evitar trabalho manual empresa por empresa.
 5. Melhorar extractor para gerar claims mais granulares por trecho, nao uma claim grande por pagina.
 ```
+
+---
+
+## 2026-06-29
+
+### Resumo executivo
+
+Sessao focada em refinar o Modo Alvo (busca por startup especifica) e preparar a pipeline interativa com visualizacao em tempo real.
+
+### O que foi feito
+
+#### 1. Extractor: chunking sentenca → paragrafo
+
+- Substituido `_split_into_sentences()` por `_split_into_paragraphs()` — divide texto por `\n\n` em vez de `.`
+- Claims passam a ser por paragrafo (~10-30 por startup) em vez de por sentenca (~140)
+- Adicionado `_is_relevant_paragraph()`: so cria claim se o paragrafo contiver AI/TECH marker real
+- Adicionado `_is_image_heavy()`: descarta paragrafos com >50% de markdown de imagem (alt text de logos, icons)
+- Adicionado `_is_navigation_ui()`: descarta paragrafos com >60% de links de navegacao (menus, sidebars, footers)
+- Adicionado `_SEMANTIC_AI_PATTERNS` (mais restritivos que `AI_MARKER_PATTERNS`) — `ai_usage` so se tiver evidencia semantica real
+- Dedup global (cross-source) em vez de por-source
+
+#### 2. Domain blocklist expandida
+
+Adicionados `tracxn.com` e `startups.com` (agregadores que poluem claims com navegacao generica).
+
+#### 3. Search Planner: qualificador IA obrigatorio + startup_name
+
+- `_expand_single_word()` agora aceita `startup_name` opcional
+- Queries curtas (<3 palavras) recebem `"{base} IA"` e `"{base} inteligencia artificial"` como *primeiras* expansoes (nao ultimas)
+- API `POST /runs` agora aceita `startup_name` no payload
+- `RadarState` ganhou campo `startup_name`
+- `search_planner_node` passa `startup_name` para `plan_search()`
+
+#### 4. Firecrawl: queries IA primeiro + per_query_limit 5
+
+- Adicionada `_prioritize_ia_queries()`: queries com "IA", "inteligencia", "artificial" sao executadas primeiro
+- `per_query_limit` aumentado de 3 para 5
+
+#### 5. Evidencia semantica antecipada no extrator
+
+- `_infer_claim_type()` agora exige `_SEMANTIC_AI_PATTERNS` (ale m de `AI_MARKER_PATTERNS`) para classificar como `ai_usage`
+- Caso contrario, a claim cai para `technology_signal` — isso evita que o validator rejeite depois
+
+#### 6. Testes com startups reais
+
+| Startup | Query | Claims | AI Usage | Validacao | Tempo |
+|---|---|---|---|---|---|
+| Tractian | "tractian" | 43 | 24 | ✅ True (medium) | ~30s |
+| Enter | "enter" | 63 | 55 | ✅ True | ~30s |
+| Fintalk | "fintalk" | 34 | 26 | ✅ True | ~30s |
+| Inner.ai | "inner.ai" | 65 | 59 | ✅ True | ~30s |
+
+#### 7. [Em progresso] Pipeline interativa com SSE
+
+Backend:
+- Endpoint `GET /runs/{run_id}/stream` (SSE) — transmite progresso dos steps em tempo real
+- Enriquecimento de `set_detail()` em cada agente com dados reais (URLs, claims, tecnologias)
+
+Frontend:
+- Vite + React + TypeScript
+- 8 bolinhas visuais com estados (idle/running/completed/error)
+- Frases contextuais com dados reais de cada etapa
+- Direcao estetica "industrial tech" (escuro + verde NVIDIA)
+
+### Arquivos alterados
+
+```text
+src/radar/agents/search_planner.py    # startup_name, expansao IA primaria
+src/radar/agents/extractor.py         # chunking paragrafo, filtros, semantica antecipada
+src/radar/agents/validator.py         # (ajustes menores de padroes)
+src/radar/graph/state.py              # +startup_name
+src/radar/graph/nodes.py              # passa startup_name
+src/radar/api/app.py                  # RunRequest.startup_name, pipeline background
+src/radar/scraping/collectors.py      # +tracxn.com, startups.com blocklist
+src/radar/scraping/adapters.py        # +_prioritize_ia_queries, per_query_limit 5
+tests/test_api_crud.py                # claim_count any(), timeout 30s
+```
+
+### Validacoes executadas
+
+```text
+ruff check src/radar tests/ -> All checks passed!
+pytest -x -q -> 161 passed, 2 warnings
+```
+
+### Proximos passos (ajustados)
+
+```text
+1. Finalizar pipeline interativa: backend SSE + frontend React
+2. Testar com mais startups brasileiras de IA
+3. Projetar Modo Radar (busca multi-angulo + cross-reference estilo Perplexity)
+4. Atualizar Relatorio de Progresso e handoff
+```
+
+---
+
+## Atualizacao 2026-06-29 - Guardrails de Pipeline e Startup Name no Frontend
+
+### Contexto
+
+Depois de testar a pipeline real com Firecrawl + LLM, foram encontrados tres problemas: detalhes ricos dos steps eram sobrescritos no final, queries ambiguas misturavam entidades e o recomendador NVIDIA aceitava tecnologias sem evidencia de dominio suficiente.
+
+### O que foi feito
+
+- `progress.py`: `PipelineTracker.complete()` agora preserva o detalhe ja registrado pelo node quando nenhum detalhe novo e passado.
+- `progress.py`: ordem dos steps registrada como `search_planner -> scraper -> extractor -> validator -> classifier -> nvidia_rag -> recommendation -> briefing`.
+- `collectors.py`: filtro de candidatos passou a rejeitar ruido como `tractian` quando a query e `traction`, alem de catalogos de pecas/carro sem contexto de startup/IA.
+- `extractor.py`: tecnologias extraidas pelo LLM agora precisam aparecer no texto coletado; `Riva` deixou de ser detectado como substring dentro de palavras como `private`.
+- `classifier.py`: classificacoes contraditorias do LLM sao rebaixadas quando a rationale diz que nao ha sinal claro.
+- `recommendation.py`: recomendacoes NVIDIA especificas agora exigem evidencias do workload correspondente; Isaac/Morpheus/Riva/Clara nao devem aparecer so por similaridade solta do RAG.
+- Frontend real (`frontend/`): `/pipeline` ganhou campo opcional `Nome completo da startup`, enviado como `startup_name` para `POST /runs`.
+- `api.ts`: `StartupRecord` agora declara `radar_score`, `evidence_count` e `recommendation_count`, removendo casts `any` no ranking.
+
+### Testes reais controlados
+
+```text
+Gupy/Gupy:
+- Antes: setor Healthcare e recomendacoes soltas como Clara/Isaac/Morpheus/Riva.
+- Depois: setor Edtech, classificacao AI-Enabled, recomendacoes focadas em AI Enterprise, NIM, NeMo, Guardrails e Inception.
+- Ainda falta: produto veio None.
+
+traction/Traction:
+- Antes: misturava traction.com, tractian.com e outros dominios ruidosos.
+- Depois: removeu pecas de caminhao/Tractian e reduziu para 5 fontes mais relacionadas.
+- Ainda falta: nome ambiguo segue misturando gettraction.ai e tractiontechnology.com; precisa de etapa futura de desambiguacao/candidatos.
+```
+
+### Validacoes executadas
+
+```text
+cd ai-agent-system
+..\venv\Scripts\python.exe -m pip check -> No broken requirements found.
+..\venv\Scripts\python.exe -m ruff check src\radar\ tests\ -> All checks passed.
+..\venv\Scripts\python.exe -m pytest -q --tb=short -> 165 passed, 2 warnings conhecidos.
+
+cd frontend
+npx tsc --noEmit -> ok
+npx eslint arquivos tocados -> ok
+npm run build -> ok, com warnings conhecidos de chunk size/imports externos.
+npm run lint -> falha global por Prettier em muitos arquivos nao relacionados; arquivos tocados foram formatados e passaram no ESLint especifico.
+```
+
+### Proximo passo recomendado
+
+```text
+1. Criar etapa explicita de desambiguacao/candidatos antes de analisar empresas com nomes ambiguos.
+2. Melhorar extractor para preencher `product` com evidencia direta.
+3. Implementar Discovery/Radar em lote para evitar busca manual empresa por empresa.
+4. Corrigir baseline global do `npm run lint`/Prettier em uma tarefa separada para evitar diffs gigantes.
+```

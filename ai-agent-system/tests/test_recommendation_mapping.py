@@ -93,3 +93,75 @@ def test_recommendation_guidance_covers_seed_knowledge_technologies() -> None:
     seed_technologies = {chunk["technology"] for chunk in get_seed_chunks()}
 
     assert seed_technologies <= set(TECHNOLOGY_GUIDANCE)
+
+def test_recommendations_filter_domain_specific_nvidia_technologies() -> None:
+    from radar.agents.recommendation import generate_recommendations
+    from radar.schemas import (
+        EvidenceClaim,
+        EvidenceValidationReport,
+        NvidiaKnowledgeChunk,
+        StartupProfile,
+    )
+
+    claim = EvidenceClaim(
+        id="claim_gupy_ai_agents",
+        source_document_id="src_gupy",
+        text="Gupy uses AI agents to screen resumes and support recruiting workflows.",
+        claim_type="ai_usage",
+        confidence=0.7,
+    )
+    validation = EvidenceValidationReport(
+        has_minimum_evidence=True,
+        source_quality="medium",
+        supporting_evidence_ids=[claim.id],
+        conflicts=[],
+        caveats=[],
+        requires_human_review=False,
+    )
+    chunks = [
+        NvidiaKnowledgeChunk(
+            id="nv_nim",
+            technology="NVIDIA NIM",
+            title="NIM",
+            url="https://www.nvidia.com/en-us/ai-data-science/products/nim-microservices/",
+            content="NIM supports optimized generative AI inference.",
+            relevance_score=0.8,
+        ),
+        NvidiaKnowledgeChunk(
+            id="nv_clara",
+            technology="NVIDIA Clara",
+            title="Clara",
+            url="https://www.nvidia.com/en-us/clara/",
+            content="Clara supports healthcare AI.",
+            relevance_score=0.8,
+        ),
+        NvidiaKnowledgeChunk(
+            id="nv_isaac",
+            technology="NVIDIA Isaac",
+            title="Isaac",
+            url="https://developer.nvidia.com/isaac",
+            content="Isaac supports robotics simulation.",
+            relevance_score=0.8,
+        ),
+    ]
+
+    _, recommendations = generate_recommendations(
+        {
+            "claims": [claim],
+            "validation": validation,
+            "nvidia_context": chunks,
+            "extracted_startups": [
+                StartupProfile(
+                    name="Gupy",
+                    sector="HR Tech",
+                    product="Recruiting platform",
+                    ai_usage_summary="AI agents for recruiting workflows.",
+                )
+            ],
+        }
+    )
+
+    technologies = {recommendation.technology for recommendation in recommendations}
+    assert "NVIDIA NIM" in technologies
+    assert "NVIDIA Clara" not in technologies
+    assert "NVIDIA Isaac" not in technologies

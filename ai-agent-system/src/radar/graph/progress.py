@@ -8,8 +8,8 @@ _STEP_ORDER = [
     "search_planner",
     "scraper",
     "extractor",
-    "classifier",
     "validator",
+    "classifier",
     "nvidia_rag",
     "recommendation",
     "briefing",
@@ -30,9 +30,10 @@ class PipelineTracker:
 
     def complete(self, step_key: str, detail: str = "") -> None:
         update_run_step_status(
-            self.run_id, step_key,
+            self.run_id,
+            step_key,
             status="completed",
-            detail=detail or f"{_step_label(step_key)} concluido",
+            detail=detail or None,
         )
 
     def fail(self, step_key: str, error: str, detail: str = "") -> None:

@@ -107,11 +107,11 @@ def _llm_classify(state: RadarState) -> StartupClassification:
             if nvidia_caveat not in caveats:
                 caveats.append(nvidia_caveat)
 
-    return StartupClassification(
+    return _sanitize_classification(
         label=label,
         confidence=confidence,
         rationale=rationale,
-        supporting_evidence_ids=[c.id for c in ai_claims],
+        ai_claims=ai_claims,
         caveats=caveats,
     )
 
@@ -135,7 +135,7 @@ def _deterministic_classify(claims, sources, profiles) -> StartupClassification:
     combined = ai_native_score + ai_enabled_score + evidence_score + business_score
     has_nvidia_techs = bool(cited_technologies and any(t in NVIDIA_TECHS for t in cited_technologies))
 
-    if ai_native_score >= 2 and combined >= 3.5:
+    if ai_native_score >= 2 and combined >= 3.5 and _list_signals(all_text, AI_NATIVE_KEYWORDS) != "nenhum sinal claro":
         return StartupClassification(
             label="AI-Native",
             confidence=min(combined / 6.0, 0.95),
@@ -172,6 +172,40 @@ def _deterministic_classify(claims, sources, profiles) -> StartupClassification:
         ),
         supporting_evidence_ids=[],
         caveats=["Ausencia de evidencia nao prova que a startup nao usa IA."],
+    )
+
+
+def _sanitize_classification(
+    label: str,
+    confidence: float,
+    rationale: str,
+    ai_claims: list,
+    caveats: list[str],
+) -> StartupClassification:
+    valid_labels = {"AI-Native", "AI-Enabled", "Non-AI"}
+    safe_label = label if label in valid_labels else "Non-AI"
+    normalized_rationale = rationale.lower()
+    contradiction_markers = (
+        "nenhum sinal claro", "sem sinal claro", "no clear signal",
+        "no clear evidence", "sem evidencia", "sem evidência",
+    )
+    has_contradiction = any(marker in normalized_rationale for marker in contradiction_markers)
+
+    if not ai_claims:
+        safe_label = "Non-AI"
+        confidence = min(confidence, 0.45)
+        caveats.append("Classificacao rebaixada: nenhuma claim validada de uso de IA foi extraida.")
+    elif safe_label == "AI-Native" and has_contradiction:
+        safe_label = "AI-Enabled"
+        confidence = min(confidence, 0.65)
+        caveats.append("Classificacao rebaixada: rationale do LLM contradizia o rotulo AI-Native.")
+
+    return StartupClassification(
+        label=safe_label,
+        confidence=max(0.0, min(confidence, 1.0)),
+        rationale=rationale or "Classificacao baseada em evidencias publicas coletadas.",
+        supporting_evidence_ids=[c.id for c in ai_claims],
+        caveats=list(dict.fromkeys(caveats)),
     )
 
 

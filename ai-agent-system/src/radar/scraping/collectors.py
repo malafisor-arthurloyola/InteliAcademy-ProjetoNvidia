@@ -21,6 +21,8 @@ DOMAIN_BLOCKLIST: set[str] = {
     "walmart.com", "aliexpress.com",
     "imdb.com",
     "spotify.com",
+    "tracxn.com",
+    "startups.com",
 }
 
 RELEVANT_DOMAIN_PATTERNS = (
@@ -110,17 +112,23 @@ def _filter_relevant_candidates(
         if _domain_matches_any(domain, DOMAIN_BLOCKLIST):
             return False
 
-        has_startup_signal = candidate.source_type != "other"
+        snippet = (candidate.snippet or "").lower()
+        title = (candidate.title or "").lower()
+        combined = f"{title} {snippet}"
+
+        if _is_candidate_company_mismatch(domain, combined, plan):
+            return False
+
+        has_context_hint = _has_context_hint(combined)
+        has_startup_signal = candidate.source_type in {"blog", "careers", "startup_directory", "news"}
         if has_startup_signal:
+            return True
+        if candidate.source_type == "official_site" and has_context_hint:
             return True
 
         domain_relevant = any(pattern in domain for pattern in RELEVANT_DOMAIN_PATTERNS) or _domain_matches_any(domain, STARTUP_DIRECTORY_DOMAINS)
         if domain_relevant:
             return True
-
-        snippet = (candidate.snippet or "").lower()
-        title = (candidate.title or "").lower()
-        combined = f"{title} {snippet}"
 
         startup_hints = ("startup", "empresa", "company", "funding",
                          "série", "series", "seed", "investimento",
@@ -132,7 +140,7 @@ def _filter_relevant_candidates(
 
         ai_hints = ("inteligência artificial", "artificial intelligence",
                     "machine learning", "deep learning",
-                    "\"ai\"", "ai-", "-ai", "/ai")
+                    "\"ai\"", " ai ", " ai-", "ai-", "-ai", "/ai")
         has_ai_hint = any(h in combined for h in ai_hints)
         if has_ai_hint:
             return True
@@ -149,6 +157,30 @@ def _filter_relevant_candidates(
 
 def _domain_matches_any(domain: str, patterns: set[str] | tuple[str, ...]) -> bool:
     return any(domain == pattern or domain.endswith(f".{pattern}") for pattern in patterns)
+
+
+def _has_context_hint(combined: str) -> bool:
+    hints = (
+        "startup", "empresa", "company", "funding", "founder", "ceo",
+        "produto", "product", "solucao", "solução", "solution",
+        "plataforma", "platform", "inteligência artificial", "artificial intelligence",
+        "machine learning", "deep learning", " ai ", " ia ", "ai-", "-ai", "/ai",
+    )
+    return any(hint in combined for hint in hints)
+
+
+def _is_candidate_company_mismatch(domain: str, combined: str, plan: SearchPlan) -> bool:
+    terms = set(_query_terms(plan))
+    text = f"{domain} {combined}"
+    if "traction" in terms and "tractian" in text:
+        return True
+    if "tractian" in terms and "traction" in text and "tractian" not in domain:
+        return True
+    commerce_noise = (
+        "heavy duty truck", "truck parts", "auto parts", "car parts",
+        "kelley blue book", "used cars", "tires", "walmart", "amazon",
+    )
+    return any(noise in text for noise in commerce_noise) and not _has_context_hint(combined)
 
 
 def _query_terms(plan: SearchPlan) -> list[str]:

@@ -6,7 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useSubmitRun, useRun } from "@/lib/hooks/use-runs";
-import { PipelineStatus, type PipelineStepData } from "@/components/pipeline-status";
+import {
+  PipelineStatus,
+  type PipelineStepData,
+} from "@/components/pipeline-status";
 import { ApiErrorDisplay } from "@/components/api-error-display";
 import { Sparkles, ArrowRight } from "lucide-react";
 import type { PipelineStepRecord } from "@/lib/api";
@@ -33,7 +36,9 @@ function formatDurationSeconds(seconds: number): string {
 
 function parseRunTimestamp(value: string | null | undefined): number | null {
   if (!value) return null;
-  const normalized = value.includes("T") ? value : `${value.replace(" ", "T")}Z`;
+  const normalized = value.includes("T")
+    ? value
+    : `${value.replace(" ", "T")}Z`;
   const parsed = Date.parse(normalized);
   return Number.isNaN(parsed) ? null : parsed;
 }
@@ -49,27 +54,44 @@ const STEP_KEYS = [
   "briefing",
 ];
 
-function mapStepStatus(status: PipelineStepRecord["status"]): PipelineStepData["status"] {
+function mapStepStatus(
+  status: PipelineStepRecord["status"],
+): PipelineStepData["status"] {
   if (status === "completed") return "done";
   if (status === "failed") return "error";
   if (status === "pending") return "idle";
-  if (status === "idle" || status === "running" || status === "error") return status;
+  if (status === "idle" || status === "running" || status === "error")
+    return status;
   return "idle";
 }
 
 function PipelinePage() {
   const search = Route.useSearch();
   const [query, setQuery] = useState("");
+  const [startupName, setStartupName] = useState("");
   const [runId, setRunId] = useState<number | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(
+    undefined,
+  );
   const autoRunRef = useRef<string | null>(null);
 
-  const { mutate: execute, isPending: isSubmitting, error: submitError } = useSubmitRun();
-  const { data: runDetail, isLoading: isPolling, error: pollError } = useRun(runId);
+  const {
+    mutate: execute,
+    isPending: isSubmitting,
+    error: submitError,
+  } = useSubmitRun();
+  const {
+    data: runDetail,
+    isLoading: isPolling,
+    error: pollError,
+  } = useRun(runId);
 
-  const isRunning = isSubmitting || (runDetail?.status === "pending" || runDetail?.status === "running");
+  const isRunning =
+    isSubmitting ||
+    runDetail?.status === "pending" ||
+    runDetail?.status === "running";
   const hasResult = runDetail?.status === "completed";
   const hasError = runDetail?.status === "failed";
 
@@ -94,7 +116,11 @@ function PipelinePage() {
       // No steps yet - show all as idle while polling begins
       return STEP_KEYS.map((key) => ({
         key,
-        status: (isRunning ? "idle" : hasResult ? "done" : "idle") as "idle" | "running" | "done" | "error",
+        status: (isRunning ? "idle" : hasResult ? "done" : "idle") as
+          | "idle"
+          | "running"
+          | "done"
+          | "error",
       }));
     }
 
@@ -105,19 +131,24 @@ function PipelinePage() {
       }
 
       const status = mapStepStatus(api.status);
-      const started = api.started_at ? new Date(api.started_at).getTime() : null;
-      const completed = api.completed_at ? new Date(api.completed_at).getTime() : null;
+      const started = api.started_at
+        ? new Date(api.started_at).getTime()
+        : null;
+      const completed = api.completed_at
+        ? new Date(api.completed_at).getTime()
+        : null;
 
       return {
         key,
         status,
         detail: api.detail ?? undefined,
         errorMessage: api.error_message ?? undefined,
-        elapsedSeconds: status === "running" && started
-          ? Math.floor((Date.now() - started) / 1000)
-          : started && completed
-            ? Math.floor((completed - started) / 1000)
-            : undefined,
+        elapsedSeconds:
+          status === "running" && started
+            ? Math.floor((Date.now() - started) / 1000)
+            : started && completed
+              ? Math.floor((completed - started) / 1000)
+              : undefined,
       };
     });
   }, [runDetail?.steps, runId, isRunning, hasResult]);
@@ -130,41 +161,57 @@ function PipelinePage() {
   }, [elapsed, runDetail?.completed_at, runDetail?.created_at]);
 
   const validationBlocked = Boolean(
-    hasResult && runDetail?.validation && !runDetail.validation.has_minimum_evidence,
+    hasResult &&
+    runDetail?.validation &&
+    !runDetail.validation.has_minimum_evidence,
   );
 
   const displayError = submitError ?? pollError ?? null;
 
-  const executePipeline = useCallback((rawQuery: string) => {
-    const nextQuery = rawQuery.trim();
-    if (!nextQuery) {
-      toast.error("Digite uma consulta para executar o pipeline.");
-      return;
-    }
-    setQuery(nextQuery);
-    setRunId(null);
-    setStartedAt(Date.now());
-    setElapsed(0);
-    execute(nextQuery, {
-      onSuccess: (res) => {
-        setRunId(res.run_id);
-        toast.success("Pipeline iniciado!");
-      },
-      onError: (err: unknown) => {
-        const msg = err && typeof err === "object" && "message" in err
-          ? String((err as { message: string }).message)
-          : "Erro ao iniciar pipeline";
-        toast.error(msg);
-      },
-    });
-  }, [execute]);
+  const executePipeline = useCallback(
+    (rawQuery: string, rawStartupName = startupName) => {
+      const nextQuery = rawQuery.trim();
+      if (!nextQuery) {
+        toast.error("Digite uma consulta para executar o pipeline.");
+        return;
+      }
+      const nextStartupName = rawStartupName.trim();
+      setQuery(nextQuery);
+      setStartupName(nextStartupName);
+      setRunId(null);
+      setStartedAt(Date.now());
+      setElapsed(0);
+      execute(
+        { query: nextQuery, startupName: nextStartupName || undefined },
+        {
+          onSuccess: (res) => {
+            setRunId(res.run_id);
+            toast.success("Pipeline iniciado!");
+          },
+          onError: (err: unknown) => {
+            const msg =
+              err && typeof err === "object" && "message" in err
+                ? String((err as { message: string }).message)
+                : "Erro ao iniciar pipeline";
+            toast.error(msg);
+          },
+        },
+      );
+    },
+    [execute, startupName],
+  );
 
   useEffect(() => {
     const incomingQuery = search.query?.trim();
     if (!incomingQuery) return;
 
     setQuery(incomingQuery);
-    if (search.autoRun && autoRunRef.current !== incomingQuery && !isRunning && !runId) {
+    if (
+      search.autoRun &&
+      autoRunRef.current !== incomingQuery &&
+      !isRunning &&
+      !runId
+    ) {
       autoRunRef.current = incomingQuery;
       executePipeline(incomingQuery);
     }
@@ -175,23 +222,36 @@ function PipelinePage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5 p-4 md:p-6">
       <div>
-        <h1 className="text-lg font-semibold text-foreground">Pipeline Multiagente</h1>
+        <h1 className="text-lg font-semibold text-foreground">
+          Pipeline Multiagente
+        </h1>
         <p className="text-xs text-muted-foreground">
-          Executa o fluxo completo: busca, coleta, extracao, classificacao, validacao, RAG NVIDIA, recomendacao e briefing.
+          Executa o fluxo completo: busca, coleta, extracao, classificacao,
+          validacao, RAG NVIDIA, recomendacao e briefing.
         </p>
       </div>
 
       {/* Search input */}
       <Card className="p-4">
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            placeholder='Ex: "startups brasileiras de IA para saude", "agentes LLM em fintechs"...'
-            className="h-10 flex-1"
-            disabled={isRunning}
-          />
+          <div className="flex flex-1 flex-col gap-2">
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              placeholder='Ex: "startups brasileiras de IA para saude", "agentes LLM em fintechs"...'
+              className="h-10"
+              disabled={isRunning}
+            />
+            <Input
+              value={startupName}
+              onChange={(e) => setStartupName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              placeholder="Nome completo da startup (opcional)"
+              className="h-10"
+              disabled={isRunning}
+            />
+          </div>
           <Button
             size="default"
             className="h-10 gap-1.5"
@@ -201,7 +261,9 @@ function PipelinePage() {
             {isRunning ? (
               <>Processando...</>
             ) : (
-              <><Sparkles className="h-4 w-4" /> Executar Pipeline</>
+              <>
+                <Sparkles className="h-4 w-4" /> Executar Pipeline
+              </>
             )}
           </Button>
         </div>
@@ -213,7 +275,9 @@ function PipelinePage() {
           <PipelineStatus
             steps={steps}
             elapsedSeconds={displayElapsed}
-            overallStatus={hasResult ? "completed" : hasError ? "error" : "pending"}
+            overallStatus={
+              hasResult ? "completed" : hasError ? "error" : "pending"
+            }
           />
         </Card>
       )}
@@ -222,9 +286,19 @@ function PipelinePage() {
       {displayError && !isRunning && (
         <ApiErrorDisplay
           error={
-            (displayError && typeof displayError === "object" && "endpoint" in displayError)
-              ? displayError as { endpoint: string; status: number; message: string }
-              : { endpoint: runId ? `GET /runs/${runId}` : "POST /runs", status: 0, message: String(displayError) }
+            displayError &&
+            typeof displayError === "object" &&
+            "endpoint" in displayError
+              ? (displayError as unknown as {
+                  endpoint: string;
+                  status: number;
+                  message: string;
+                })
+              : {
+                  endpoint: runId ? `GET /runs/${runId}` : "POST /runs",
+                  status: 0,
+                  message: String(displayError),
+                }
           }
           onRetry={handleSubmit}
         />
@@ -236,12 +310,18 @@ function PipelinePage() {
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-foreground">Pipeline concluido</h2>
+                <h2 className="text-sm font-semibold text-foreground">
+                  Pipeline concluido
+                </h2>
                 <p className="text-xs text-muted-foreground">
-                  Consulta: "{runDetail.query}" - Duracao: {formatDurationSeconds(displayElapsed)}
+                  Consulta: "{runDetail.query}" - Duracao:{" "}
+                  {formatDurationSeconds(displayElapsed)}
                 </p>
               </div>
-              <Badge variant="outline" className="gap-1.5 border-green-500/30 bg-green-500/10 text-green-600">
+              <Badge
+                variant="outline"
+                className="gap-1.5 border-green-500/30 bg-green-500/10 text-green-600"
+              >
                 Run #{runDetail.id}
               </Badge>
             </div>
@@ -255,9 +335,14 @@ function PipelinePage() {
               </h3>
               <div className="space-y-2">
                 {runDetail.recommendations.map((r) => (
-                  <div key={r.id} className="rounded-md border border-border p-3">
+                  <div
+                    key={r.id}
+                    className="rounded-md border border-border p-3"
+                  >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium text-foreground">{r.technology}</span>
+                      <span className="text-sm font-medium text-foreground">
+                        {r.technology}
+                      </span>
                       <Badge variant="outline" className="text-[10px]">
                         Prioridade {r.priority}
                       </Badge>
@@ -266,13 +351,16 @@ function PipelinePage() {
                       </Badge>
                     </div>
                     <p className="mt-1 text-xs text-foreground">
-                      <span className="font-medium">Gap alvo:</span> {r.target_gap}
+                      <span className="font-medium">Gap alvo:</span>{" "}
+                      {r.target_gap}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      <span className="font-medium">Tecnico:</span> {r.technical_justification}
+                      <span className="font-medium">Tecnico:</span>{" "}
+                      {r.technical_justification}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      <span className="font-medium">Negocio:</span> {r.business_justification}
+                      <span className="font-medium">Negocio:</span>{" "}
+                      {r.business_justification}
                     </p>
                     <p className="mt-1 text-[11px] text-primary">
                       Proxima acao: {r.suggested_next_action}
@@ -289,7 +377,9 @@ function PipelinePage() {
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold text-foreground">
-                    {validationBlocked ? "Recomendacoes bloqueadas pela validacao" : "Nenhuma recomendacao gerada"}
+                    {validationBlocked
+                      ? "Recomendacoes bloqueadas pela validacao"
+                      : "Nenhuma recomendacao gerada"}
                   </h3>
                   {runDetail.validation && (
                     <Badge variant="outline" className="text-[10px]">
@@ -305,7 +395,8 @@ function PipelinePage() {
                   </ul>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Pipeline executou mas nao gerou recomendacoes. Verifique os steps acima para detalhes.
+                    Pipeline executou mas nao gerou recomendacoes. Verifique os
+                    steps acima para detalhes.
                   </p>
                 )}
               </div>
@@ -313,7 +404,12 @@ function PipelinePage() {
           )}
 
           <div className="flex justify-end">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSubmit}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleSubmit}
+            >
               <Sparkles className="h-3.5 w-3.5" /> Executar novamente
             </Button>
           </div>
@@ -322,17 +418,25 @@ function PipelinePage() {
 
       {/* Rules card (always visible) */}
       <Card className="p-4">
-        <h3 className="mb-2 text-sm font-semibold text-foreground">Regras do pipeline</h3>
+        <h3 className="mb-2 text-sm font-semibold text-foreground">
+          Regras do pipeline
+        </h3>
         <ul className="grid gap-1.5 text-xs text-foreground sm:grid-cols-2">
-          <li>- Coleta restrita a informacoes publicas, respeitando robots.txt.</li>
+          <li>
+            - Coleta restrita a informacoes publicas, respeitando robots.txt.
+          </li>
           <li>- URL e trecho original sempre preservados como evidencia.</li>
-          <li>- Classificacao AI-Native / AI-Enabled / Non-AI com criterios explicitos.</li>
+          <li>
+            - Classificacao AI-Native / AI-Enabled / Non-AI com criterios
+            explicitos.
+          </li>
           <li>- Recomendacao NVIDIA exige ao menos uma evidencia validada.</li>
           <li>- Base NVIDIA consultada via RAG antes de toda recomendacao.</li>
-          <li>- Briefing executivo agrega justificativa tecnica e de negocio.</li>
+          <li>
+            - Briefing executivo agrega justificativa tecnica e de negocio.
+          </li>
         </ul>
       </Card>
     </div>
   );
 }
-

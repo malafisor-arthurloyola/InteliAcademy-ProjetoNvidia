@@ -48,7 +48,7 @@ TECHNOLOGY_KEYWORDS: list[tuple[Pattern[str], str]] = [
     (re.compile(r"isaac\s+(sim|robot)", re.IGNORECASE), "Isaac"),
     (re.compile(r"clara", re.IGNORECASE), "Clara"),
     (re.compile(r"morpheus", re.IGNORECASE), "Morpheus"),
-    (re.compile(r"riva", re.IGNORECASE), "Riva"),
+    (re.compile(r"\briva\b", re.IGNORECASE), "Riva"),
     (re.compile(r"nvidia\s+inception", re.IGNORECASE), "NVIDIA Inception"),
     (re.compile(r"ai\s+enterprise", re.IGNORECASE), "AI Enterprise"),
     (re.compile(r"\b(llm|llms)\b|large\s+language\s+model", re.IGNORECASE), "LLM"),
@@ -63,7 +63,8 @@ TECHNOLOGY_KEYWORDS: list[tuple[Pattern[str], str]] = [
 ]
 
 AI_MARKER_PATTERNS: list[Pattern[str]] = [
-    re.compile(r"\b[Aa][Ii]\b"),                            # "AI" as word
+    re.compile(r"\b[Aa][Ii]\b"),                            # "AI" as word (English)
+    re.compile(r"\b[Ii][Aa]\b"),                            # "IA" as word (Portuguese)
     re.compile(r"\bintelig[eê]ncia\s+artificial\b"),       # "inteligencia artificial"
     re.compile(r"\bartificial\s+intelligence\b"),           # "artificial intelligence"
     re.compile(r"\bllm\b|\bllms\b", re.IGNORECASE),        # "LLM"
@@ -85,9 +86,67 @@ TECH_MARKER_PATTERNS: list[Pattern[str]] = [
 ]
 
 
-def _split_into_sentences(text: str) -> list[str]:
-    parts = re.split(r"(?<=[.!?])\s+", text)
-    return [p.strip() for p in parts if len(p.strip()) > 20]
+def _split_into_paragraphs(text: str) -> list[str]:
+    cleaned = re.sub(r"\n{3,}", "\n\n", text)
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    raw_chunks = re.split(r"\n\s*\n", cleaned)
+    chunks = [c.strip() for c in raw_chunks]
+    meaningful = [c for c in chunks if len(c) > 30]
+    if not meaningful and chunks:
+        candidate = " ".join(chunks).strip()
+        if len(candidate) > 40:
+            meaningful = [candidate]
+    return meaningful
+
+
+_IMAGE_PATTERN = re.compile(r"!\[.*?\]\(.*?\)")
+_LINK_PATTERN = re.compile(r"\[.*?\]\(.*?\)")
+
+_SEMANTIC_AI_PATTERNS: list[Pattern[str]] = [
+    re.compile(r"\b[Aa][Ii]\b"),
+    re.compile(r"\b[Ii][Aa]\b"),
+    re.compile(r"\bintelig[eê]ncia\s+artificial\b"),
+    re.compile(r"\bartificial\s+intelligence\b"),
+    re.compile(r"\bllm\b|\bllms\b", re.IGNORECASE),
+    re.compile(r"\bmachine\s+learning\b", re.IGNORECASE),
+    re.compile(r"\bdeep\s+learning\b", re.IGNORECASE),
+    re.compile(r"\bneural\s+network", re.IGNORECASE),
+    re.compile(r"\bGPT\b|\bgpt-|\bchatgpt\b", re.IGNORECASE),
+    re.compile(r"\bfine[ -]?tun(?:ing|ed)\b", re.IGNORECASE),
+    re.compile(r"\bopenai\b", re.IGNORECASE),
+    re.compile(r"\btransformers?\b", re.IGNORECASE),
+]
+
+
+def _is_image_heavy(text: str) -> bool:
+    images = _IMAGE_PATTERN.findall(text)
+    if not images:
+        return False
+    img_chars = sum(len(img) for img in images)
+    return img_chars > len(text) * 0.5
+
+
+def _is_navigation_ui(text: str) -> bool:
+    links = _LINK_PATTERN.findall(text)
+    if not links:
+        return False
+    link_chars = sum(len(link) for link in links)
+    return link_chars > len(text) * 0.6
+
+
+def _is_relevant_paragraph(text: str) -> bool:
+    stripped = text.strip()
+    if len(stripped) < 30:
+        return False
+    if _is_image_heavy(stripped):
+        return False
+    if _is_navigation_ui(stripped):
+        return False
+    if any(p.search(text) for p in AI_MARKER_PATTERNS):
+        return True
+    if any(p.search(text) for p in TECH_MARKER_PATTERNS):
+        return True
+    return False
 
 
 def extract_startups_and_claims(state: RadarState) -> tuple[list[StartupProfile], list[EvidenceClaim]]:
@@ -95,16 +154,18 @@ def extract_startups_and_claims(state: RadarState) -> tuple[list[StartupProfile]
     query = state.get("query", "Unknown startup")
     claims: list[EvidenceClaim] = []
 
+    seen_texts: set[str] = set()
     for source in sources:
         if not source.text:
             continue
-        sentences = _split_into_sentences(source.text)
-        seen_texts: set[str] = set()
-        for sentence in sentences:
-            claim_type = _infer_claim_type(sentence)
+        paragraphs = _split_into_paragraphs(source.text)
+        for paragraph in paragraphs:
+            if not _is_relevant_paragraph(paragraph):
+                continue
+            claim_type = _infer_claim_type(paragraph)
             confidence = _infer_claim_confidence(source.source_type, claim_type)
-            preview = sentence[:300]
-            dedup_key = preview.lower().strip()
+            preview = paragraph[:500]
+            dedup_key = preview.lower().strip()[:100]
             if dedup_key not in seen_texts:
                 seen_texts.add(dedup_key)
                 claims.append(
@@ -257,9 +318,13 @@ def _extract_technologies(text: str) -> list[str]:
 
 
 def _infer_claim_type(text: str) -> str:
-    if any(pattern.search(text) for pattern in AI_MARKER_PATTERNS):
+    has_ai_marker = any(p.search(text) for p in AI_MARKER_PATTERNS)
+    has_semantic_ai = any(p.search(text) for p in _SEMANTIC_AI_PATTERNS)
+    if has_ai_marker and has_semantic_ai:
         return "ai_usage"
-    if any(pattern.search(text) for pattern in TECH_MARKER_PATTERNS):
+    if has_ai_marker:
+        return "technology_signal"
+    if any(p.search(text) for p in TECH_MARKER_PATTERNS):
         return "technology_signal"
     return "public_signal"
 

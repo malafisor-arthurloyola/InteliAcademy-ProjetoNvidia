@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import unicodedata
+
 from radar.graph.state import RadarState
 from radar.schemas import NvidiaKnowledgeChunk, NvidiaRecommendation, TechnicalGap
 
@@ -136,6 +138,26 @@ TECHNOLOGY_GUIDANCE = {
 }
 
 
+
+TECHNOLOGY_EVIDENCE_PATTERNS: dict[str, tuple[str, ...]] = {
+    "NVIDIA Inception": ("ai", "ia", "startup", "empresa", "platform", "plataforma"),
+    "NVIDIA NIM": ("llm", "generative", "generativa", "agent", "agente", "chatbot", "inference", "inferencia"),
+    "NVIDIA NeMo": ("llm", "generative", "generativa", "fine tuning", "fine-tuning", "agent", "agente", "evaluation"),
+    "NeMo Guardrails": ("agent", "agente", "assistant", "assistente", "governance", "governanca", "guardrail", "workflow"),
+    "NVIDIA Triton Inference Server": ("inference", "inferencia", "serving", "latency", "latencia", "production", "producao"),
+    "TensorRT-LLM": ("llm", "latency", "latencia", "throughput", "inference", "inferencia"),
+    "NVIDIA RAPIDS": ("data", "dados", "analytics", "tabular", "etl", "dataframe"),
+    "cuDF": ("dataframe", "tabular", "pandas", "etl", "dados"),
+    "cuML": ("machine learning", "predictive", "preditivo", "tabular", "modelo"),
+    "CUDA": ("gpu", "cuda", "performance", "aceleracao", "acceleration"),
+    "NVIDIA Riva": ("voice", "voz", "speech", "audio", "transcricao", "transcription", "asr", "tts", "call center"),
+    "NVIDIA Clara": ("healthcare", "saude", "medical", "clinica", "clinical", "life sciences"),
+    "NVIDIA Omniverse": ("simulation", "simulacao", "digital twin", "3d", "industrial"),
+    "NVIDIA Isaac": ("robot", "robotica", "robotics"),
+    "NVIDIA Morpheus": ("cyber", "cybersecurity", "threat", "ameaca", "anomaly", "anomalia"),
+    "NVIDIA AI Enterprise": ("production", "producao", "enterprise", "seguranca", "security", "governance", "governanca", "compliance"),
+}
+
 def generate_recommendations(state: RadarState) -> tuple[list[TechnicalGap], list[NvidiaRecommendation]]:
     validation = state.get("validation")
     if not validation or not validation.has_minimum_evidence:
@@ -145,12 +167,13 @@ def generate_recommendations(state: RadarState) -> tuple[list[TechnicalGap], lis
     if not nvidia_context:
         return [], []
 
+    evidence_text = _evidence_text(state, validation.supporting_evidence_ids)
     gaps: list[TechnicalGap] = []
     recommendations: list[NvidiaRecommendation] = []
 
     for chunk in nvidia_context:
         guidance = TECHNOLOGY_GUIDANCE.get(chunk.technology)
-        if not guidance:
+        if not guidance or not _technology_supported(chunk.technology, evidence_text):
             continue
 
         gap = _build_gap(chunk, guidance["gap"], validation.supporting_evidence_ids)
@@ -182,4 +205,40 @@ def _build_gap(
         description=description,
         evidence_ids=evidence_ids,
         severity=severity,
+    )
+
+
+def _evidence_text(state: RadarState, evidence_ids: list[str]) -> str:
+    supported = [
+        claim.text
+        for claim in state.get("claims", [])
+        if claim.id in evidence_ids
+    ]
+    profiles = state.get("extracted_startups", [])
+    if profiles:
+        profile = profiles[0]
+        supported.extend(
+            part for part in (
+                profile.sector,
+                profile.product,
+                profile.ai_usage_summary,
+                " ".join(profile.cited_technologies),
+            ) if part
+        )
+    return _normalize("\n".join(supported))
+
+
+def _technology_supported(technology: str, evidence_text: str) -> bool:
+    patterns = TECHNOLOGY_EVIDENCE_PATTERNS.get(technology, ())
+    if technology in {"NVIDIA Inception", "NVIDIA AI Enterprise"}:
+        return bool(evidence_text) and any(pattern in evidence_text for pattern in patterns)
+    return any(pattern in evidence_text for pattern in patterns)
+
+
+def _normalize(text: str) -> str:
+    return (
+        unicodedata.normalize("NFKD", text)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+        .lower()
     )

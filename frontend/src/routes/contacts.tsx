@@ -90,7 +90,7 @@ function ContactsPage() {
     return (
       <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
         <ApiErrorDisplay
-          error={error as ApiError}
+          error={error as unknown as ApiError}
           onRetry={() => {
             void healthQuery.refetch();
             void startupsQuery.refetch();

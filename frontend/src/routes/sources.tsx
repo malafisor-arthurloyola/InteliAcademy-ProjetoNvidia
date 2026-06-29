@@ -133,7 +133,7 @@ function SourcesPage() {
     return (
       <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
         <ApiErrorDisplay
-          error={error as ApiError}
+          error={error as unknown as ApiError}
           onRetry={() => (healthError ? retryHealth() : retrySources())}
         />
       </div>
@@ -207,7 +207,12 @@ function SourcesPage() {
               className="h-9 pl-8"
             />
           </div>
-          <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={handleExportCsv}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 text-xs"
+            onClick={handleExportCsv}
+          >
             <Download className="h-3.5 w-3.5" /> CSV
           </Button>
         </div>
