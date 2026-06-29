@@ -52,17 +52,26 @@ def test_root_endpoint_points_to_docs_and_health() -> None:
     assert response.json()["docs"] == "/docs"
 
 
-def test_local_frontend_cors_preflight() -> None:
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ],
+)
+def test_local_frontend_cors_preflight(origin: str) -> None:
     client = TestClient(app)
     response = client.options(
         "/health",
         headers={
-            "Origin": "http://localhost:5173",
+            "Origin": origin,
             "Access-Control-Request-Method": "GET",
         },
     )
     assert response.status_code == 200
-    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert response.headers["access-control-allow-origin"] == origin
 
 
 def test_provider_preflight_endpoint() -> None:
