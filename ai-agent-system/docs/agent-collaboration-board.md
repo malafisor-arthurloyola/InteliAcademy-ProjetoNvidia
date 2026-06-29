@@ -93,21 +93,21 @@ Fase 4b: Frontend dashboard completo com API real.                     ✅
 Resumo atual:
 
 ```text
-Pipeline em background estabilizado na main.
-Backend FastAPI, SQLite/Alembic, LangGraph, RAG NVIDIA e frontend /pipeline validados juntos por testes automatizados e build.
-A pagina /pipeline agora mostra steps reais via GET /runs/{id}; VITE_API_BASE_URL e respeitado no frontend.
+Pipeline em background esta funcional, mas teste real com `gupy` revelou gargalo de qualidade/UX: coleta gerou fontes e claims, porem validacao bloqueou recomendacoes por evidencia fraca.
+Codex corrigiu inferencia de fonte oficial por dominio+query no Firecrawl, expos `validation` em GET /runs/{id} e fez /pipeline mostrar duracao real e caveats do bloqueio.
+O fluxo atual ainda e manual empresa por empresa; proxima fase recomendada e Discovery/Radar em lote com fila de candidatos vindos das fontes do documento-fonte.
 Profile permanece mock (baixa prioridade); producao ainda pede worker/fila e PostgreSQL.
 ```
 
 Ultima atualizacao:
 
 ```text
-2026-06-29 - Codex corrigiu contrato de progresso do pipeline, persistencia de status terminal e validou pytest/build/alembic.
+2026-06-29 - Codex corrigiu UX de bloqueio sem recomendacoes, expos validacao no detalhe do run, melhorou inferencia de fonte oficial e validou ruff/pip check/pytest/build.
 ```
 Proxima verificacao sugerida:
 
 ```text
-Subir backend + frontend localmente e fazer smoke test manual com uma query real autorizada, observando progresso por step e recomendacoes.
+Implementar Discovery/Radar em lote: fontes recomendadas -> candidatos -> dedupe -> fila de analise -> dashboard/ranking, mantendo busca individual como diagnostico pontual.
 ```
 
 ## Acao necessaria do usuario
@@ -166,13 +166,7 @@ Data:
 
 ## Tarefa em andamento
 
-Status: concluido por Codex.
-
-Objetivo atual:
-
-```text
-Estabilizar UX do pipeline em background: contrato de steps, persistencia final, testes assincronos, README e validacoes.
-```
+Status: concluido por Codex.`r`n`r`nObjetivo atual:`r`n`r`n```text`r`nDiagnosticar coleta real/UX de bloqueio e preparar proxima fase de Discovery em lote.`r`n```
 ## Arquivos reservados
 
 Agente: Codex
@@ -335,3 +329,4 @@ cd ai-agent-system
 - 2026-06-20: PlaywrightPageAdapter implementado (Chromium headless + trafilatura). `settings.py`, `provider_factory.py`, `provider_preflight.py` atualizados. 9 novos testes. pytest 77 passed, ruff ok.
 - 2026-06-20: LLM adapter system implementado (Groq primario + OpenAI/Gemini fallback). `src/radar/llm/` criado com adapters e prompts. Extractor e Classifier com LLM + fallback deterministico. 15 novos testes. pytest 92 passed, ruff ok. Handoff, Relatorio, README, Obsidian atualizados.
 - 2026-06-29: Codex estabilizou progresso real do pipeline em background, corrigiu status terminal/persistencia SQLite, alinhou frontend `completed -> done`, validou `ruff`, `pip check`, `pytest 155 passed`, `npm run build`, Alembic upgrade/downgrade e smoke backend+frontend `/pipeline`.
+- 2026-06-29: Codex diagnosticou run real `gupy` sem recomendacoes: fontes oficiais marcadas como `other` derrubavam confidence para 0.3; corrigiu inferencia de official_site por dominio+query, expos `validation` em GET /runs/{id}, ajustou timer/caveats na /pipeline e validou ruff, pip check, pytest 159 passed e npm run build.

@@ -322,6 +322,30 @@ def save_validation(run_id: int, data: dict[str, Any]) -> int:
         return cur.lastrowid or 0
 
 
+def get_run_validation(run_id: int) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT has_minimum_evidence, source_quality, supporting_evidence_ids,
+                   conflicts, caveats, requires_human_review
+            FROM validations
+            WHERE run_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (run_id,),
+        ).fetchone()
+        if not row:
+            return None
+
+    validation = dict(row)
+    validation["has_minimum_evidence"] = bool(validation["has_minimum_evidence"])
+    validation["requires_human_review"] = bool(validation["requires_human_review"])
+    for key in ("supporting_evidence_ids", "conflicts", "caveats"):
+        value = validation.get(key)
+        validation[key] = json.loads(value) if isinstance(value, str) and value else []
+    return validation
+
 def save_recommendation(run_id: int, data: dict[str, Any]) -> str:
     with get_connection() as conn:
         conn.execute(
@@ -466,4 +490,5 @@ def get_startup_by_id(startup_id: str) -> dict[str, Any] | None:
             _STARTUP_SELECT + "WHERE s.id = ?", (startup_id,)
         ).fetchone()
         return dict(row) if row else None
+
 

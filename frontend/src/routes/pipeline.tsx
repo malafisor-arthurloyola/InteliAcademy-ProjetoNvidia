@@ -25,11 +25,17 @@ export const Route = createFileRoute("/pipeline")({
   component: PipelinePage,
 });
 
-function formatDuration(start: number | null, end: number | null): string {
-  if (!start) return "0s";
-  const s = Math.floor(((end ?? Date.now()) - start) / 1000);
-  const m = Math.floor(s / 60);
-  return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+function formatDurationSeconds(seconds: number): string {
+  const safeSeconds = Math.max(0, seconds);
+  const m = Math.floor(safeSeconds / 60);
+  return m > 0 ? `${m}m ${safeSeconds % 60}s` : `${safeSeconds}s`;
+}
+
+function parseRunTimestamp(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const normalized = value.includes("T") ? value : `${value.replace(" ", "T")}Z`;
+  const parsed = Date.parse(normalized);
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 const STEP_KEYS = [
@@ -85,7 +91,7 @@ function PipelinePage() {
 
     const apiSteps = runDetail?.steps;
     if (!apiSteps || apiSteps.length === 0) {
-      // No steps yet — show all as idle while polling begins
+      // No steps yet - show all as idle while polling begins
       return STEP_KEYS.map((key) => ({
         key,
         status: (isRunning ? "idle" : hasResult ? "done" : "idle") as "idle" | "running" | "done" | "error",
@@ -115,6 +121,17 @@ function PipelinePage() {
       };
     });
   }, [runDetail?.steps, runId, isRunning, hasResult]);
+
+  const displayElapsed = useMemo(() => {
+    const started = parseRunTimestamp(runDetail?.created_at);
+    if (!started) return elapsed;
+    const completed = parseRunTimestamp(runDetail?.completed_at);
+    return Math.floor(((completed ?? Date.now()) - started) / 1000);
+  }, [elapsed, runDetail?.completed_at, runDetail?.created_at]);
+
+  const validationBlocked = Boolean(
+    hasResult && runDetail?.validation && !runDetail.validation.has_minimum_evidence,
+  );
 
   const displayError = submitError ?? pollError ?? null;
 
@@ -160,7 +177,7 @@ function PipelinePage() {
       <div>
         <h1 className="text-lg font-semibold text-foreground">Pipeline Multiagente</h1>
         <p className="text-xs text-muted-foreground">
-          Executa o fluxo completo: busca, coleta, extração, classificação, validação, RAG NVIDIA, recomendação e briefing.
+          Executa o fluxo completo: busca, coleta, extracao, classificacao, validacao, RAG NVIDIA, recomendacao e briefing.
         </p>
       </div>
 
@@ -171,7 +188,7 @@ function PipelinePage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            placeholder='Ex: "startups brasileiras de IA para saúde", "agentes LLM em fintechs"…'
+            placeholder='Ex: "startups brasileiras de IA para saude", "agentes LLM em fintechs"...'
             className="h-10 flex-1"
             disabled={isRunning}
           />
@@ -195,7 +212,7 @@ function PipelinePage() {
         <Card className="p-4">
           <PipelineStatus
             steps={steps}
-            elapsedSeconds={elapsed}
+            elapsedSeconds={displayElapsed}
             overallStatus={hasResult ? "completed" : hasError ? "error" : "pending"}
           />
         </Card>
@@ -219,9 +236,9 @@ function PipelinePage() {
           <Card className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-foreground">Pipeline concluído</h2>
+                <h2 className="text-sm font-semibold text-foreground">Pipeline concluido</h2>
                 <p className="text-xs text-muted-foreground">
-                  Consulta: "{runDetail.query}" · Duração: {formatDuration(startedAt, Date.now())}
+                  Consulta: "{runDetail.query}" - Duracao: {formatDurationSeconds(displayElapsed)}
                 </p>
               </div>
               <Badge variant="outline" className="gap-1.5 border-green-500/30 bg-green-500/10 text-green-600">
@@ -234,7 +251,7 @@ function PipelinePage() {
           {runDetail.recommendations.length > 0 && (
             <Card className="p-4">
               <h3 className="mb-3 text-sm font-semibold text-foreground">
-                Recomendações NVIDIA ({runDetail.recommendations.length})
+                Recomendacoes NVIDIA ({runDetail.recommendations.length})
               </h3>
               <div className="space-y-2">
                 {runDetail.recommendations.map((r) => (
@@ -252,13 +269,13 @@ function PipelinePage() {
                       <span className="font-medium">Gap alvo:</span> {r.target_gap}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      <span className="font-medium">Técnico:</span> {r.technical_justification}
+                      <span className="font-medium">Tecnico:</span> {r.technical_justification}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      <span className="font-medium">Negócio:</span> {r.business_justification}
+                      <span className="font-medium">Negocio:</span> {r.business_justification}
                     </p>
                     <p className="mt-1 text-[11px] text-primary">
-                      Próxima ação: {r.suggested_next_action}
+                      Proxima acao: {r.suggested_next_action}
                     </p>
                   </div>
                 ))}
@@ -269,9 +286,29 @@ function PipelinePage() {
           {/* No results */}
           {runDetail.recommendations.length === 0 && (
             <Card className="p-4">
-              <p className="text-sm text-muted-foreground">
-                Pipeline executou mas não gerou recomendações. Verifique os steps acima para detalhes.
-              </p>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {validationBlocked ? "Recomendacoes bloqueadas pela validacao" : "Nenhuma recomendacao gerada"}
+                  </h3>
+                  {runDetail.validation && (
+                    <Badge variant="outline" className="text-[10px]">
+                      Evidencia {runDetail.validation.source_quality}
+                    </Badge>
+                  )}
+                </div>
+                {runDetail.validation?.caveats.length ? (
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    {runDetail.validation.caveats.map((caveat) => (
+                      <li key={caveat}>- {caveat}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Pipeline executou mas nao gerou recomendacoes. Verifique os steps acima para detalhes.
+                  </p>
+                )}
+              </div>
             </Card>
           )}
 
@@ -287,12 +324,12 @@ function PipelinePage() {
       <Card className="p-4">
         <h3 className="mb-2 text-sm font-semibold text-foreground">Regras do pipeline</h3>
         <ul className="grid gap-1.5 text-xs text-foreground sm:grid-cols-2">
-          <li>• Coleta restrita a informações públicas, respeitando robots.txt.</li>
-          <li>• URL e trecho original sempre preservados como evidência.</li>
-          <li>• Classificação AI-Native / AI-Enabled / Non-AI com critérios explícitos.</li>
-          <li>• Recomendação NVIDIA exige ao menos uma evidência validada.</li>
-          <li>• Base NVIDIA consultada via RAG antes de toda recomendação.</li>
-          <li>• Briefing executivo agrega justificativa técnica e de negócio.</li>
+          <li>- Coleta restrita a informacoes publicas, respeitando robots.txt.</li>
+          <li>- URL e trecho original sempre preservados como evidencia.</li>
+          <li>- Classificacao AI-Native / AI-Enabled / Non-AI com criterios explicitos.</li>
+          <li>- Recomendacao NVIDIA exige ao menos uma evidencia validada.</li>
+          <li>- Base NVIDIA consultada via RAG antes de toda recomendacao.</li>
+          <li>- Briefing executivo agrega justificativa tecnica e de negocio.</li>
         </ul>
       </Card>
     </div>

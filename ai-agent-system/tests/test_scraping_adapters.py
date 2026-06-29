@@ -10,6 +10,7 @@ from radar.scraping.adapters import (
     HtmlPageContentAdapter,
     PageContentAdapter,
     SerpApiSearchAdapter,
+    _infer_source_type_from_url,
 )
 from radar.graph.nodes import scraper_node
 from radar.scraping.collectors import SearchBackedCollector
@@ -33,6 +34,22 @@ def test_serpapi_adapter_normalizes_fixture_results() -> None:
     assert candidates[0].rank == 1
     assert candidates[1].source_type == "news"
 
+
+def test_firecrawl_source_type_infers_official_company_domain() -> None:
+    assert (
+        _infer_source_type_from_url(
+            "https://www.gupy.io/software-de-recrutamento-e-selecao",
+            query="gupy",
+        )
+        == "official_site"
+    )
+    assert (
+        _infer_source_type_from_url(
+            "https://startups.com.br/noticias/gupy-ia",
+            query="gupy",
+        )
+        == "news"
+    )
 
 def test_page_content_adapter_uses_candidate_metadata() -> None:
     search_adapter = SerpApiSearchAdapter(_load_fixture("serpapi_ai_startups.json"))
@@ -170,3 +187,4 @@ def _search_plan() -> SearchPlan:
         source_types=["official_site", "news"],
         collection_plan=["fixture search", "fixture page extraction"],
     )
+

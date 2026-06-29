@@ -13,6 +13,7 @@ from radar.database import (
     get_run_evidence_claims,
     get_run_recommendations,
     get_run_source_documents,
+    get_run_validation,
     get_startup_by_id,
     init_db,
     save_evidence_claim,
@@ -216,7 +217,13 @@ def test_save_validation() -> None:
             "requires_human_review": False,
         },
     )
-    assert get_run_by_id(run_id) is not None
+    validation = get_run_validation(run_id)
+    assert validation is not None
+    assert validation["has_minimum_evidence"] is True
+    assert validation["source_quality"] == "strong"
+    assert validation["supporting_evidence_ids"] == ["e1", "e2"]
+    assert validation["caveats"] == ["Small sample"]
+    assert validation["requires_human_review"] is False
 
 
 def test_get_all_startups_returns_in_order() -> None:
@@ -236,3 +243,4 @@ def test_get_run_by_id_none() -> None:
 
 def test_get_startup_by_id_none() -> None:
     assert get_startup_by_id("nonexistent") is None
+

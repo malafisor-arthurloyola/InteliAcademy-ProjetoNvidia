@@ -7,6 +7,7 @@ from radar.database.repository import (
     get_run_recommendations,
     get_run_source_documents,
     get_run_steps,
+    get_run_validation,
     get_runs_by_startup,
     get_startup_by_id,
     init_db,
@@ -38,8 +39,10 @@ __all__ = [
     "get_run_evidence_claims",
     "get_run_recommendations",
     "get_run_steps",
+    "get_run_validation",
     "get_run_source_documents",
     "get_runs_by_startup",
     "get_all_startups",
     "get_startup_by_id",
 ]
+

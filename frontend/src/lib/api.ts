@@ -86,6 +86,15 @@ export interface PipelineStepRecord {
   started_at: string | null;
   completed_at: string | null;
 }
+export interface ValidationRecord {
+  has_minimum_evidence: boolean;
+  source_quality: string;
+  supporting_evidence_ids: string[];
+  conflicts: string[];
+  caveats: string[];
+  requires_human_review: boolean;
+}
+
 
 export interface RunDetail {
   id: number;
@@ -96,6 +105,7 @@ export interface RunDetail {
   completed_at: string | null;
   recommendations: RecommendationRecord[];
   steps: PipelineStepRecord[];
+  validation: ValidationRecord | null;
 }
 
 export interface StartupRecord {

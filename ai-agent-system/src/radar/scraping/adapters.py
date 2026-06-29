@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from typing import Any
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
@@ -187,7 +188,7 @@ class FirecrawlSearchAdapter:
                 "url": item.url,
                 "title": item.title or "",
                 "description": item.description or "",
-                "source_type": _infer_source_type_from_url(item.url),
+                "source_type": _infer_source_type_from_url(item.url, plan.query),
                 "rank": len(candidates) + 1,
             })
         for item in (response.news or []):
@@ -300,8 +301,12 @@ def _ensure_api_key(api_key: str | None, provider: str) -> None:
         )
 
 
-def _infer_source_type_from_url(url: str) -> str:
+def _infer_source_type_from_url(url: str, query: str | None = None) -> str:
     url_lower = url.lower()
+    parsed = urlparse(url_lower)
+    domain = parsed.netloc.removeprefix("www.")
+    query_terms = _meaningful_query_terms(query)
+
     if any(d in url_lower for d in ("crunchbase", "pitchbook", "startupbase", "distrito")):
         return "startup_directory"
     if any(d in url_lower for d in ("linkedin", "glassdoor")):
@@ -314,4 +319,35 @@ def _infer_source_type_from_url(url: str) -> str:
         return "blog"
     if any(j in url_lower for j in ("/sobre", "/about", "/quem-somos")):
         return "official_site"
+    if query_terms and any(term in domain for term in query_terms):
+        return "official_site"
     return "other"
+
+
+def _meaningful_query_terms(query: str | None) -> list[str]:
+    if not query:
+        return []
+    stopwords = {
+        "a",
+        "as",
+        "com",
+        "de",
+        "do",
+        "da",
+        "das",
+        "dos",
+        "e",
+        "em",
+        "ia",
+        "o",
+        "os",
+        "para",
+        "startup",
+        "startups",
+    }
+    terms = []
+    for raw in query.lower().replace("-", " ").replace("_", " ").split():
+        term = "".join(char for char in raw if char.isalnum())
+        if len(term) >= 3 and term not in stopwords:
+            terms.append(term)
+    return terms

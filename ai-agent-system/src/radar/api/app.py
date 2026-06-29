@@ -24,6 +24,7 @@ from radar.database import (
     get_run_recommendations,
     get_run_source_documents,
     get_run_steps,
+    get_run_validation,
     get_runs_by_startup,
     get_startup_by_id,
     init_db,
@@ -254,6 +255,7 @@ def get_run(run_id: int) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="Run not found")
     run["recommendations"] = get_run_recommendations(run_id)
     run["steps"] = get_run_steps(run_id)
+    run["validation"] = get_run_validation(run_id)
     return run
 
 
@@ -275,4 +277,5 @@ def list_startup_runs(startup_id: str) -> list[dict[str, Any]]:
     if not get_startup_by_id(startup_id):
         raise HTTPException(status_code=404, detail="Startup not found")
     return get_runs_by_startup(startup_id)
+
 

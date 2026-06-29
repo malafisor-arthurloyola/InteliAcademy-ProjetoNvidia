@@ -1556,3 +1556,70 @@ Em pipeline assincrono, o status `completed` precisa significar "tudo que a UI v
 4. Revisar warnings conhecidos: Starlette TestClient/httpx2 e google.generativeai deprecated.
 ```
 
+
+---
+
+## 2026-06-29 (Diagnostico de coleta real, UX de bloqueio e arquitetura de descoberta)
+
+### Problema registrado
+
+Teste real com query `gupy` mostrou que o backend nao estava parado: o run terminou em aproximadamente 82s, coletou fontes e claims, mas nao gerou recomendacoes. O gargalo foi a validacao de evidencia: paginas oficiais como `www.gupy.io/...` foram classificadas como `other`, reduzindo a confianca das claims para 0.3 e bloqueando `classifier -> nvidia_rag -> recommendation`.
+
+Na UI isso parecia falha silenciosa: o timer podia ficar em 0s e a pagina dizia apenas que nao havia recomendacoes, sem mostrar os caveats do validador.
+
+### O que foi corrigido
+
+- `FirecrawlSearchAdapter` agora usa a query para inferir fonte oficial quando o dominio combina com o nome pesquisado, preservando news/directories antes dessa regra.
+- `GET /runs/{id}` agora inclui `validation`, com `has_minimum_evidence`, `source_quality`, `supporting_evidence_ids`, `conflicts`, `caveats` e `requires_human_review`.
+- `/pipeline` calcula duracao a partir de `created_at` e `completed_at` reais do run, em vez de depender apenas do timer local.
+- `/pipeline` mostra quando recomendacoes foram bloqueadas pela validacao e lista os caveats persistidos.
+- Textos estaticos alterados na tela foram normalizados para ASCII para evitar mojibake no Windows.
+
+### Diagnostico de arquitetura
+
+A percepcao do usuario esta correta: o objetivo do documento-fonte e um Radar de descoberta e qualificacao de startups brasileiras, nao apenas uma busca manual empresa por empresa. O fluxo atual e util para analise individual, mas ainda falta um modo principal de descoberta em lote.
+
+Arquitetura recomendada para a proxima fase:
+
+```text
+radar_discovery_run
+ -> discovery_planner usa fontes recomendadas no documento-fonte
+ -> search/scrape em lote por fontes como StartSe, Distrito, Latitud, Cubo, ACE, Endeavor, Abstartups, 100 Open Startups e noticias
+ -> candidate_extractor identifica nomes/dominios de startups
+ -> dedupe/ranking inicial cria fila de candidatos
+ -> pipeline individual roda para top N candidatos
+ -> dashboard/ranking mostra empresas ja analisadas e pendentes
+```
+
+### Arquivos principais alterados
+
+```text
+ai-agent-system/src/radar/scraping/adapters.py
+ai-agent-system/src/radar/database/repository.py
+ai-agent-system/src/radar/database/__init__.py
+ai-agent-system/src/radar/api/app.py
+ai-agent-system/tests/test_database.py
+ai-agent-system/tests/test_scraping_adapters.py
+frontend/src/lib/api.ts
+frontend/src/routes/pipeline.tsx
+```
+
+### Validacoes executadas
+
+```text
+ruff check src/radar tests -> All checks passed.
+pytest tests/test_database.py tests/test_scraping_adapters.py -q -> 22 passed.
+npm run build -> OK.
+pip check -> No broken requirements found.
+pytest -x -q -> 159 passed, 2 warnings conhecidos.
+```
+
+### Proximos passos sugeridos
+
+```text
+1. Implementar modo Discovery/Radar em lote como fluxo principal, mantendo busca individual como diagnostico pontual.
+2. Criar schema/tabela para startup_candidates com nome, dominio, fonte, score preliminar e status de analise.
+3. Adicionar endpoint POST /discovery-runs com limite controlado de candidatos e sem novos providers externos.
+4. Mostrar na Overview empresas descobertas/analisadas automaticamente, para evitar trabalho manual empresa por empresa.
+5. Melhorar extractor para gerar claims mais granulares por trecho, nao uma claim grande por pagina.
+```
