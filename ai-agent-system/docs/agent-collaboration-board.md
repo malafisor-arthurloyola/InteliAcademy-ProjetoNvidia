@@ -234,6 +234,19 @@ Inicio:
 - 2026-06-22
 Fim:
 - pendente
+Agente: Opencode
+Arquivos:
+- src/radar/agents/extractor.py
+- src/radar/agents/validator.py
+- src/radar/agents/search_planner.py
+- src/radar/scraping/collectors.py
+Motivo:
+- Correcao arquitetural: AI_MARKERS word boundary, extracao por sentenca, filtro de dominios, expansao de query, validacao semantica de claims.
+Inicio:
+- 2026-06-29
+Fim:
+- 2026-06-29
+
 Quando um agente for editar, registrar assim:
 
 ```text
@@ -330,3 +343,10 @@ cd ai-agent-system
 - 2026-06-20: LLM adapter system implementado (Groq primario + OpenAI/Gemini fallback). `src/radar/llm/` criado com adapters e prompts. Extractor e Classifier com LLM + fallback deterministico. 15 novos testes. pytest 92 passed, ruff ok. Handoff, Relatorio, README, Obsidian atualizados.
 - 2026-06-29: Codex estabilizou progresso real do pipeline em background, corrigiu status terminal/persistencia SQLite, alinhou frontend `completed -> done`, validou `ruff`, `pip check`, `pytest 155 passed`, `npm run build`, Alembic upgrade/downgrade e smoke backend+frontend `/pipeline`.
 - 2026-06-29: Codex diagnosticou run real `gupy` sem recomendacoes: fontes oficiais marcadas como `other` derrubavam confidence para 0.3; corrigiu inferencia de official_site por dominio+query, expos `validation` em GET /runs/{id}, ajustou timer/caveats na /pipeline e validou ruff, pip check, pytest 159 passed e npm run build.
+- 2026-06-29: Opencode fez revisao arquitetural e corrigiu 5 problemas raiz:
+  1. `extractor.py`: AI_MARKERS trocado de substring ("ai", "ia") para regex word boundary (`\b[Aa][Ii]\b`), eliminando falso positivo massivo em "trail", "domain", "industrial", "financial" etc.
+  2. `extractor.py`: extracao por sentenca em vez de pagina inteira — cada claim agora isola o trecho relevante.
+  3. `collectors.py`: filtro de dominios irrelevantes com `DOMAIN_BLOCKLIST` (YouTube, Amazon, KBB, Wikipedia etc.) e `_filter_relevant_candidates()`.
+  4. `search_planner.py`: expansao de queries curtas — "traction" vira multiplas variacoes com contexto de startup/IA/Brasil.
+  5. `validator.py`: validacao semantica de claims — rejeita claims `ai_usage` que nao contenham evidencia real de IA apos re-avaliacao com regex word boundary.
+  Codex revisou o diff, corrigiu uso real das queries expandidas no Firecrawl, reforcou filtro de subdominios/diretorios e validou: pip check ok, ruff ok, pytest 161 passed. Commit/push realizado na main.

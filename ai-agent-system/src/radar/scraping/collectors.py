@@ -6,6 +6,38 @@ from typing import Protocol
 from radar.schemas import PipelineError, SearchPlan, SourceCandidate, SourceDocument
 from radar.scraping.normalizers import normalize_source_payloads
 
+DOMAIN_BLOCKLIST: set[str] = {
+    "youtube.com", "youtu.be",
+    "amazon.com", "amazon.com.br",
+    "kbb.com", "kelleybluebook.com",
+    "wikipedia.org", "pt.wikipedia.org",
+    "dictionary.com", "merriam-webster.com",
+    "urbandictionary.com",
+    "pinterest.com", "pinterest.com.br",
+    "instagram.com", "facebook.com",
+    "twitter.com", "x.com", "tiktok.com",
+    "reddit.com",
+    "ebay.com", "ebay.com.br",
+    "walmart.com", "aliexpress.com",
+    "imdb.com",
+    "spotify.com",
+}
+
+RELEVANT_DOMAIN_PATTERNS = (
+    "startup", "crunchbase", "pitchbook", "distrito",
+    "linkedin", "glassdoor",
+    "forbes", "valor", "globo", "infomoney",
+    "blog.",
+)
+
+STARTUP_DIRECTORY_DOMAINS = (
+    "crunchbase", "pitchbook", "startupbase", "distrito",
+    "cubo.network", "acestartups", "endeavor",
+    "abstartups", "bossainvest", "liga.ventures",
+    "openstartups", "startse", "latitud",
+    "wow.ac", "inovativa", "darwinstartups",
+)
+
 
 class WebCollector(ABC):
     @abstractmethod
@@ -49,6 +81,8 @@ class SearchBackedCollector(WebCollector):
                 )
             ]
 
+        candidates = _filter_relevant_candidates(candidates, plan)
+
         sources: list[SourceDocument] = []
         errors: list[PipelineError] = []
         for candidate in candidates:
@@ -67,6 +101,65 @@ class SearchBackedCollector(WebCollector):
                 )
         return sources, errors
 
+
+def _filter_relevant_candidates(
+    candidates: list[SourceCandidate], plan: SearchPlan
+) -> list[SourceCandidate]:
+    def is_relevant(candidate: SourceCandidate) -> bool:
+        domain = candidate.domain.lower().removeprefix("www.")
+        if _domain_matches_any(domain, DOMAIN_BLOCKLIST):
+            return False
+
+        has_startup_signal = candidate.source_type != "other"
+        if has_startup_signal:
+            return True
+
+        domain_relevant = any(pattern in domain for pattern in RELEVANT_DOMAIN_PATTERNS) or _domain_matches_any(domain, STARTUP_DIRECTORY_DOMAINS)
+        if domain_relevant:
+            return True
+
+        snippet = (candidate.snippet or "").lower()
+        title = (candidate.title or "").lower()
+        combined = f"{title} {snippet}"
+
+        startup_hints = ("startup", "empresa", "company", "funding",
+                         "série", "series", "seed", "investimento",
+                         "founder", "ceo", "lança", "product",
+                         "solução", "solution", "plataforma", "platform")
+        has_hint = any(h in combined for h in startup_hints)
+        if has_hint:
+            return True
+
+        ai_hints = ("inteligência artificial", "artificial intelligence",
+                    "machine learning", "deep learning",
+                    "\"ai\"", "ai-", "-ai", "/ai")
+        has_ai_hint = any(h in combined for h in ai_hints)
+        if has_ai_hint:
+            return True
+
+        query_terms = _query_terms(plan)
+        has_query_match = any(term in domain for term in query_terms)
+        if has_query_match:
+            return True
+
+        return False
+
+    return [c for c in candidates if is_relevant(c)]
+
+
+def _domain_matches_any(domain: str, patterns: set[str] | tuple[str, ...]) -> bool:
+    return any(domain == pattern or domain.endswith(f".{pattern}") for pattern in patterns)
+
+
+def _query_terms(plan: SearchPlan) -> list[str]:
+    stopwords = {"ai", "ia", "brasil", "brazil", "startup", "startups", "empresa", "tecnologia"}
+    terms: list[str] = []
+    for raw in [plan.query, *plan.keywords]:
+        for part in raw.lower().replace("-", " ").replace("_", " ").split():
+            term = "".join(char for char in part if char.isalnum())
+            if len(term) > 2 and term not in stopwords and term not in terms:
+                terms.append(term)
+    return terms
 
 def _provider_name(provider: object) -> str:
     return str(getattr(provider, "provider", provider.__class__.__name__))

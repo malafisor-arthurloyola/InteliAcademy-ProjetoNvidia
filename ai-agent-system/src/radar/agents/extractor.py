@@ -62,8 +62,32 @@ TECHNOLOGY_KEYWORDS: list[tuple[Pattern[str], str]] = [
     (re.compile(r"gpu|inferencia|inference\s+(?:serv|optim)", re.IGNORECASE), "GPU Inference"),
 ]
 
-AI_MARKERS = ("ai", "ia", "llm", "machine learning", "agents", "automation")
-TECH_MARKERS = ("pipeline", "production", "evaluation", "workflow", "data")
+AI_MARKER_PATTERNS: list[Pattern[str]] = [
+    re.compile(r"\b[Aa][Ii]\b"),                            # "AI" as word
+    re.compile(r"\bintelig[eê]ncia\s+artificial\b"),       # "inteligencia artificial"
+    re.compile(r"\bartificial\s+intelligence\b"),           # "artificial intelligence"
+    re.compile(r"\bllm\b|\bllms\b", re.IGNORECASE),        # "LLM"
+    re.compile(r"\bmachine\s+learning\b", re.IGNORECASE),  # "machine learning"
+    re.compile(r"\bagents?\b", re.IGNORECASE),              # "agent" or "agents"
+    re.compile(r"\bautomation\b", re.IGNORECASE),           # "automation"
+    re.compile(r"\bdeep\s+learning\b", re.IGNORECASE),      # "deep learning"
+    re.compile(r"\bneural\s+network", re.IGNORECASE),       # "neural network"
+    re.compile(r"\bGPT\b|\bgpt-|\bchatgpt\b", re.IGNORECASE), # "GPT", "GPT-*", "ChatGPT"
+    re.compile(r"\bopenai\b", re.IGNORECASE),               # "OpenAI"
+    re.compile(r"\bfine[ -]?tun(?:ing|ed)\b", re.IGNORECASE), # "fine-tuning", "finetuned"
+]
+TECH_MARKER_PATTERNS: list[Pattern[str]] = [
+    re.compile(r"\bpipeline\b", re.IGNORECASE),
+    re.compile(r"\bproduction\b", re.IGNORECASE),
+    re.compile(r"\bevaluation\b", re.IGNORECASE),
+    re.compile(r"\bworkflow\b", re.IGNORECASE),
+    re.compile(r"\bdata\b", re.IGNORECASE),
+]
+
+
+def _split_into_sentences(text: str) -> list[str]:
+    parts = re.split(r"(?<=[.!?])\s+", text)
+    return [p.strip() for p in parts if len(p.strip()) > 20]
 
 
 def extract_startups_and_claims(state: RadarState) -> tuple[list[StartupProfile], list[EvidenceClaim]]:
@@ -74,16 +98,23 @@ def extract_startups_and_claims(state: RadarState) -> tuple[list[StartupProfile]
     for source in sources:
         if not source.text:
             continue
-        claim_type = _infer_claim_type(source.text)
-        confidence = _infer_claim_confidence(source.source_type, claim_type)
-        claims.append(
-            EvidenceClaim(
-                source_document_id=source.id,
-                text=source.text[:500],
-                claim_type=claim_type,
-                confidence=confidence,
-            )
-        )
+        sentences = _split_into_sentences(source.text)
+        seen_texts: set[str] = set()
+        for sentence in sentences:
+            claim_type = _infer_claim_type(sentence)
+            confidence = _infer_claim_confidence(source.source_type, claim_type)
+            preview = sentence[:300]
+            dedup_key = preview.lower().strip()
+            if dedup_key not in seen_texts:
+                seen_texts.add(dedup_key)
+                claims.append(
+                    EvidenceClaim(
+                        source_document_id=source.id,
+                        text=preview,
+                        claim_type=claim_type,
+                        confidence=confidence,
+                    )
+                )
 
     profile = _build_profile(query, sources, claims)
     return [profile], claims
@@ -226,10 +257,9 @@ def _extract_technologies(text: str) -> list[str]:
 
 
 def _infer_claim_type(text: str) -> str:
-    normalized_text = text.lower()
-    if any(marker in normalized_text for marker in AI_MARKERS):
+    if any(pattern.search(text) for pattern in AI_MARKER_PATTERNS):
         return "ai_usage"
-    if any(marker in normalized_text for marker in TECH_MARKERS):
+    if any(pattern.search(text) for pattern in TECH_MARKER_PATTERNS):
         return "technology_signal"
     return "public_signal"
 

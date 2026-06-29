@@ -5,15 +5,16 @@ from pathlib import Path
 
 import pytest
 
-from radar.schemas import PipelineError, SearchPlan
+from radar.schemas import PipelineError, SearchPlan, SourceCandidate
 from radar.scraping.adapters import (
     HtmlPageContentAdapter,
     PageContentAdapter,
     SerpApiSearchAdapter,
     _infer_source_type_from_url,
+    _search_queries_for_plan,
 )
 from radar.graph.nodes import scraper_node
-from radar.scraping.collectors import SearchBackedCollector
+from radar.scraping.collectors import SearchBackedCollector, _filter_relevant_candidates
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
@@ -33,6 +34,26 @@ def test_serpapi_adapter_normalizes_fixture_results() -> None:
     assert candidates[0].provider == "serpapi"
     assert candidates[0].rank == 1
     assert candidates[1].source_type == "news"
+
+
+def test_firecrawl_search_queries_use_short_query_expansions() -> None:
+    plan = SearchPlan(
+        query="traction",
+        keywords=[
+            "traction",
+            "traction startup",
+            "traction Brasil startup",
+            "traction AI",
+        ],
+        source_types=["official_site"],
+        collection_plan=[],
+    )
+
+    assert _search_queries_for_plan(plan) == [
+        "traction",
+        "traction startup",
+        "traction Brasil startup",
+    ]
 
 
 def test_firecrawl_source_type_infers_official_company_domain() -> None:
@@ -118,6 +139,47 @@ def test_html_page_content_adapter_rejects_payload_without_html() -> None:
     with pytest.raises(ValueError, match="must include an html field"):
         page_adapter.fetch(candidate)
 
+
+def test_filter_relevant_candidates_blocks_noise_and_keeps_directories() -> None:
+    plan = SearchPlan(
+        query="traction",
+        keywords=["traction", "traction startup"],
+        source_types=["official_site", "startup_directory"],
+        collection_plan=[],
+    )
+    candidates = [
+        SourceCandidate(
+            url="https://m.youtube.com/watch?v=123",
+            domain="m.youtube.com",
+            source_type="other",
+            title="Traction video",
+            snippet="Random video",
+            provider="fixture",
+        ),
+        SourceCandidate(
+            url="https://example.startse.com/traction-startup",
+            domain="example.startse.com",
+            source_type="other",
+            title="Traction startup",
+            snippet="Startup profile",
+            provider="fixture",
+        ),
+        SourceCandidate(
+            url="https://traction.example.com/",
+            domain="traction.example.com",
+            source_type="other",
+            title="Traction company",
+            snippet="Company profile",
+            provider="fixture",
+        ),
+    ]
+
+    filtered = _filter_relevant_candidates(candidates, plan)
+
+    assert [candidate.domain for candidate in filtered] == [
+        "example.startse.com",
+        "traction.example.com",
+    ]
 
 def test_search_backed_collector_composes_search_and_page_adapters() -> None:
     collector = SearchBackedCollector(

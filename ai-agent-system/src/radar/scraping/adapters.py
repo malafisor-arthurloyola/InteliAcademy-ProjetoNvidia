@@ -180,25 +180,38 @@ class FirecrawlSearchAdapter:
         from firecrawl import Firecrawl
 
         client = Firecrawl(api_key=self._settings.firecrawl_api_key)
-        response = client.search(query=plan.query, limit=10)
 
         candidates = []
-        for item in (response.web or []):
-            candidates.append({
-                "url": item.url,
-                "title": item.title or "",
-                "description": item.description or "",
-                "source_type": _infer_source_type_from_url(item.url, plan.query),
-                "rank": len(candidates) + 1,
-            })
-        for item in (response.news or []):
-            candidates.append({
-                "url": item.url,
-                "title": item.title or "",
-                "description": item.snippet or "",
-                "source_type": "news",
-                "rank": len(candidates) + 1,
-            })
+        seen_urls: set[str] = set()
+        search_queries = _search_queries_for_plan(plan)
+        per_query_limit = max(3, 10 // len(search_queries))
+
+        for search_query in search_queries:
+            response = client.search(query=search_query, limit=per_query_limit)
+            for item in (response.web or []):
+                url = str(item.url)
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                candidates.append({
+                    "url": item.url,
+                    "title": item.title or "",
+                    "description": item.description or "",
+                    "source_type": _infer_source_type_from_url(item.url, plan.query),
+                    "rank": len(candidates) + 1,
+                })
+            for item in (response.news or []):
+                url = str(item.url)
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                candidates.append({
+                    "url": item.url,
+                    "title": item.title or "",
+                    "description": item.snippet or "",
+                    "source_type": "news",
+                    "rank": len(candidates) + 1,
+                })
 
         return normalize_search_result_payloads(
             [{  # normalize_search_result_payload expects specific keys
@@ -299,6 +312,17 @@ def _ensure_api_key(api_key: str | None, provider: str) -> None:
         raise ExternalProviderCredentialsError(
             f"{provider} is enabled but no API key was configured."
         )
+
+
+def _search_queries_for_plan(plan: SearchPlan, max_queries: int = 3) -> list[str]:
+    queries = [plan.query.strip()]
+    for keyword in plan.keywords:
+        normalized = keyword.strip()
+        if normalized and normalized not in queries:
+            queries.append(normalized)
+        if len(queries) >= max_queries:
+            break
+    return queries
 
 
 def _infer_source_type_from_url(url: str, query: str | None = None) -> str:
