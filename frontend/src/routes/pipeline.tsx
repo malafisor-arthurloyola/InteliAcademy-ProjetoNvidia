@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { useSubmitRun, useRun } from "@/lib/hooks/use-runs";
 import { PipelineStatus, type PipelineStepData } from "@/components/pipeline-status";
 import { ApiErrorDisplay } from "@/components/api-error-display";
 import { Sparkles, ArrowRight } from "lucide-react";
+import type { PipelineStepRecord } from "@/lib/api";
 
 export const Route = createFileRoute("/pipeline")({
   head: () => ({ meta: [{ title: "Pipeline Multiagente — NVIDIA Toph" }] }),
@@ -20,6 +21,25 @@ function formatDuration(start: number | null, end: number | null): string {
   const s = Math.floor(((end ?? Date.now()) - start) / 1000);
   const m = Math.floor(s / 60);
   return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+}
+
+const STEP_KEYS = [
+  "search_planner",
+  "scraper",
+  "extractor",
+  "validator",
+  "classifier",
+  "nvidia_rag",
+  "recommendation",
+  "briefing",
+];
+
+function mapStepStatus(status: PipelineStepRecord["status"]): PipelineStepData["status"] {
+  if (status === "completed") return "done";
+  if (status === "failed") return "error";
+  if (status === "pending") return "idle";
+  if (status === "idle" || status === "running" || status === "error") return status;
+  return "idle";
 }
 
 function PipelinePage() {
@@ -48,23 +68,42 @@ function PipelinePage() {
     return () => clearInterval(timerRef.current);
   }, [runDetail?.status, startedAt]);
 
-  // Build step data from run state
-  const steps: PipelineStepData[] = [
-    { key: "search_planner", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "scraper", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "extractor", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "classifier", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "validator", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "rag", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "recommendation", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-    { key: "briefing", status: isRunning ? "running" : hasResult ? "done" : "idle" },
-  ];
+  // Build step data from run state (real API steps when available)
+  const steps = useMemo<PipelineStepData[]>(() => {
+    if (!runId) return [];
 
-  if (hasError) {
-    steps.forEach((s) => {
-      if (s.status === "running") s.status = "error";
+    const apiSteps = runDetail?.steps;
+    if (!apiSteps || apiSteps.length === 0) {
+      // No steps yet — show all as idle while polling begins
+      return STEP_KEYS.map((key) => ({
+        key,
+        status: (isRunning ? "idle" : hasResult ? "done" : "idle") as "idle" | "running" | "done" | "error",
+      }));
+    }
+
+    return STEP_KEYS.map((key) => {
+      const api = apiSteps.find((s) => s.step_key === key);
+      if (!api) {
+        return { key, status: "idle" as const };
+      }
+
+      const status = mapStepStatus(api.status);
+      const started = api.started_at ? new Date(api.started_at).getTime() : null;
+      const completed = api.completed_at ? new Date(api.completed_at).getTime() : null;
+
+      return {
+        key,
+        status,
+        detail: api.detail ?? undefined,
+        errorMessage: api.error_message ?? undefined,
+        elapsedSeconds: status === "running" && started
+          ? Math.floor((Date.now() - started) / 1000)
+          : started && completed
+            ? Math.floor((completed - started) / 1000)
+            : undefined,
+      };
     });
-  }
+  }, [runDetail?.steps, runId, isRunning, hasResult]);
 
   const displayError = submitError ?? pollError ?? null;
 
@@ -205,7 +244,7 @@ function PipelinePage() {
           {runDetail.recommendations.length === 0 && (
             <Card className="p-4">
               <p className="text-sm text-muted-foreground">
-                Pipeline executou mas não gerou recomendações. Verifique a consulta ou os logs do backend.
+                Pipeline executou mas não gerou recomendações. Verifique os steps acima para detalhes.
               </p>
             </Card>
           )}
@@ -233,3 +272,4 @@ function PipelinePage() {
     </div>
   );
 }
+

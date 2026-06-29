@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import asdict
@@ -22,6 +23,7 @@ from radar.database import (
     get_run_evidence_claims,
     get_run_recommendations,
     get_run_source_documents,
+    get_run_steps,
     get_runs_by_startup,
     get_startup_by_id,
     init_db,
@@ -36,6 +38,7 @@ from radar.database import (
 )
 from radar.database.connection import get_db_path
 from radar.graph.builder import build_graph
+from radar.graph.progress import PipelineTracker, set_tracker
 from radar.scraping.provider_preflight import inspect_provider_setup
 
 
@@ -54,7 +57,25 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
         alembic_command.upgrade(cfg, "head")
     else:
         init_db()
+
+    _prewarm_vector_store()
     yield
+
+
+def _prewarm_vector_store() -> None:
+    try:
+        from radar.rag.retriever import ensure_seeded
+
+        def _warm():
+            import logging
+            logging.getLogger("radar").info("Pre-warming vector store (sentence-transformers)...")
+            ensure_seeded()
+            logging.getLogger("radar").info("Vector store pre-warmed successfully.")
+
+        t = threading.Thread(target=_warm, daemon=True)
+        t.start()
+    except Exception:
+        pass
 
 
 app = FastAPI(title="NVIDIA Startup AI Radar", lifespan=lifespan)
@@ -94,7 +115,6 @@ def _persist_run_result(run_id: int, result: dict[str, Any]) -> None:  # noqa: C
         }
         startup_id = save_startup(startup_dict)
         update_run_startup(run_id, startup_id)
-        update_run_status(run_id, "completed")
 
         for src in result.get("sources", []):
             save_source_document(run_id, src.model_dump())
@@ -108,6 +128,8 @@ def _persist_run_result(run_id: int, result: dict[str, Any]) -> None:  # noqa: C
 
         for rec in result.get("recommendations", []):
             save_recommendation(run_id, rec.model_dump())
+
+        update_run_status(run_id, "completed")
     else:
         update_run_status(run_id, "failed")
 
@@ -160,23 +182,40 @@ def provider_preflight() -> dict[str, object]:
 
 @app.post("/runs")
 def run_analysis(payload: RunRequest) -> dict[str, Any]:
-    if not payload.query.strip():
+    query = payload.query.strip()
+    if not query:
         raise HTTPException(status_code=400, detail="query must not be empty")
 
-    run_id = save_run(payload.query)
+    run_id = save_run(query)
+    update_run_status(run_id, "pending")
+
+    tracker = PipelineTracker(run_id)
+    tracker.ensure_steps_registered()
+
+    threading.Thread(
+        target=_run_pipeline_background,
+        args=(run_id, query, tracker),
+        daemon=True,
+    ).start()
+
+    return jsonable_encoder({"run_id": run_id, "status": "pending"})
+
+
+def _run_pipeline_background(run_id: int, query: str, tracker: PipelineTracker) -> None:
     update_run_status(run_id, "running")
+    set_tracker(tracker)
     try:
         graph = build_graph()
         result: dict[str, Any] = graph.invoke(
-            {"query": payload.query, "collection_attempts": 0}
+            {"query": query, "collection_attempts": 0}
         )
         _persist_run_result(run_id, result)
-        return jsonable_encoder(
-            {"run_id": run_id, "status": "completed", "result": result}
-        )
     except Exception as exc:
+        import logging
+        logging.getLogger("radar").error("Pipeline run %d failed: %s", run_id, exc)
         update_run_status(run_id, "failed")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        set_tracker(None)
 
 
 @app.get("/runs")
@@ -209,6 +248,7 @@ def get_run(run_id: int) -> dict[str, Any]:
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
     run["recommendations"] = get_run_recommendations(run_id)
+    run["steps"] = get_run_steps(run_id)
     return run
 
 
@@ -230,3 +270,4 @@ def list_startup_runs(startup_id: str) -> list[dict[str, Any]]:
     if not get_startup_by_id(startup_id):
         raise HTTPException(status_code=404, detail="Startup not found")
     return get_runs_by_startup(startup_id)
+

@@ -82,6 +82,20 @@ def init_db() -> None:
                 startup_evidence_ids TEXT DEFAULT '[]',
                 nvidia_knowledge_ids TEXT DEFAULT '[]'
             );
+
+            CREATE TABLE IF NOT EXISTS run_steps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id INTEGER NOT NULL REFERENCES runs(id),
+                step_key TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'idle',
+                detail TEXT,
+                error_message TEXT,
+                started_at TEXT,
+                completed_at TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_run_steps_run_id ON run_steps(run_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_run_steps_run_step ON run_steps(run_id, step_key);
         """)
 
 
@@ -97,9 +111,78 @@ def save_run(query: str, startup_id: str | None = None) -> int:
 def update_run_status(run_id: int, status: str) -> None:
     with get_connection() as conn:
         conn.execute(
-            "UPDATE runs SET status = ?, completed_at = datetime('now') WHERE id = ?",
-            (status, run_id),
+            """
+            UPDATE runs
+            SET status = ?,
+                completed_at = CASE
+                    WHEN ? IN ('completed', 'failed') THEN datetime('now')
+                    ELSE NULL
+                END
+            WHERE id = ?
+            """,
+            (status, status, run_id),
         )
+
+
+def update_run_step_status(
+    run_id: int,
+    step_key: str,
+    status: str | None = None,
+    detail: str | None = None,
+    error_message: str | None = None,
+) -> None:
+    with get_connection() as conn:
+        existing = conn.execute(
+            "SELECT id, status FROM run_steps WHERE run_id = ? AND step_key = ?",
+            (run_id, step_key),
+        ).fetchone()
+        if existing:
+            sets = []
+            params: list = []
+            if status is not None:
+                sets.append("status = ?")
+                params.append(status)
+            if detail is not None:
+                sets.append("detail = ?")
+                params.append(detail)
+            if error_message is not None:
+                sets.append("error_message = ?")
+                params.append(error_message)
+            if status == "running":
+                sets.append("started_at = datetime('now')")
+                sets.append("completed_at = NULL")
+            if status in ("completed", "error"):
+                sets.append("completed_at = datetime('now')")
+            if sets:
+                params.append(existing["id"])
+                conn.execute(
+                    f"UPDATE run_steps SET {', '.join(sets)} WHERE id = ?",
+                    params,
+                )
+        else:
+            conn.execute(
+                """INSERT INTO run_steps
+                   (run_id, step_key, status, detail, error_message, started_at, completed_at)
+                   VALUES (?, ?, ?, ?, ?,
+                           CASE WHEN ? = 'running' THEN datetime('now') ELSE NULL END,
+                           CASE WHEN ? IN ('completed','error') THEN datetime('now') ELSE NULL END)""",
+                (
+                    run_id, step_key,
+                    status or "idle",
+                    detail, error_message,
+                    status, status,
+                ),
+            )
+
+
+def get_run_steps(run_id: int) -> list[dict[str, object]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT step_key, status, detail, error_message, started_at, completed_at "
+            "FROM run_steps WHERE run_id = ? ORDER BY id ASC",
+            (run_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def update_run_startup(run_id: int, startup_id: str) -> None:
@@ -383,3 +466,4 @@ def get_startup_by_id(startup_id: str) -> dict[str, Any] | None:
             _STARTUP_SELECT + "WHERE s.id = ?", (startup_id,)
         ).fetchone()
         return dict(row) if row else None
+

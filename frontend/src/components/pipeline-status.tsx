@@ -28,9 +28,9 @@ const PIPELINE_STEPS: Step[] = [
   { key: "search_planner", name: "Search Planner", icon: Search },
   { key: "scraper", name: "Scraper", icon: Globe },
   { key: "extractor", name: "Extractor", icon: FileText },
-  { key: "classifier", name: "Classifier", icon: Tags },
   { key: "validator", name: "Validator", icon: ShieldCheck },
-  { key: "rag", name: "RAG Agent", icon: BookOpen },
+  { key: "classifier", name: "Classifier", icon: Tags },
+  { key: "nvidia_rag", name: "RAG Agent", icon: BookOpen },
   { key: "recommendation", name: "Recommendation", icon: Lightbulb },
   { key: "briefing", name: "Briefing", icon: FileSpreadsheet },
 ];
@@ -40,6 +40,7 @@ export interface PipelineStepData {
   status: StepStatus;
   elapsedSeconds?: number;
   errorMessage?: string;
+  detail?: string;
 }
 
 interface PipelineStatusProps {
@@ -135,11 +136,30 @@ export function PipelineStatus({ steps, elapsedSeconds, overallStatus }: Pipelin
                       {formatTime(step.elapsedSeconds)}
                     </p>
                   )}
+                  {step.status === "running" && !step.elapsedSeconds && step.detail && (
+                    <p className="truncate text-[11px] text-muted-foreground animate-pulse">
+                      {step.detail}
+                    </p>
+                  )}
+                  {step.status === "running" && step.elapsedSeconds !== undefined && step.detail && (
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {step.detail}
+                    </p>
+                  )}
                   {step.status === "error" && step.errorMessage && (
                     <p className="truncate text-[11px] text-destructive">{step.errorMessage}</p>
                   )}
-                  {step.status === "done" && (
+                  {step.status === "error" && !step.errorMessage && step.detail && (
+                    <p className="truncate text-[11px] text-destructive">{step.detail}</p>
+                  )}
+                  {step.status === "done" && step.detail && (
+                    <p className="truncate text-[11px] text-green-600">{step.detail}</p>
+                  )}
+                  {step.status === "done" && !step.detail && (
                     <p className="text-[11px] text-green-600">Concluído</p>
+                  )}
+                  {step.status === "idle" && (
+                    <p className="text-[11px] text-muted-foreground/50">Aguardando...</p>
                   )}
                 </div>
               </div>
@@ -150,3 +170,4 @@ export function PipelineStatus({ steps, elapsedSeconds, overallStatus }: Pipelin
     </div>
   );
 }
+

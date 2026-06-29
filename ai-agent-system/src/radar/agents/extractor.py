@@ -4,6 +4,7 @@ import json
 import re
 from typing import Dict, Pattern
 
+from radar.graph.progress import get_tracker
 from radar.graph.state import RadarState
 from radar.llm import EXTRACTION_PROMPT, run_llm_with_fallback
 from radar.schemas import EvidenceClaim, SourceDocument, StartupProfile
@@ -93,13 +94,19 @@ def _build_profile(
 ) -> StartupProfile:
     all_text = " ".join(s.text for s in sources if s.text)
 
+    tracker = get_tracker()
     settings = get_settings()
     if settings.enable_external_providers:
         try:
+            if tracker:
+                tracker.set_detail("extractor", "Extraindo dados via Groq LLM...")
             return _llm_extract(query, sources, claims)
         except Exception:
-            pass
+            if tracker:
+                tracker.set_detail("extractor", "LLM falhou, usando extração por regex...")
 
+    if tracker:
+        tracker.set_detail("extractor", "Extraindo dados via regex e regras...")
     return _deterministic_extract(query, all_text, sources, claims)
 
 

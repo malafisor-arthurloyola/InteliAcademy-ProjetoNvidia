@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from radar.graph.progress import get_tracker
 from radar.graph.state import RadarState
 from radar.llm import CLASSIFICATION_PROMPT, run_llm_with_fallback
 from radar.schemas import StartupClassification
@@ -45,13 +46,19 @@ def classify_startup(state: RadarState) -> StartupClassification:
     sources = state.get("sources", [])
     profiles = state.get("extracted_startups", [])
 
+    tracker = get_tracker()
     settings = get_settings()
     if settings.enable_external_providers:
         try:
+            if tracker:
+                tracker.set_detail("classifier", "Classificando via Groq LLM...")
             return _llm_classify(state)
         except Exception:
-            pass
+            if tracker:
+                tracker.set_detail("classifier", "LLM falhou, usando classificador determinístico...")
 
+    if tracker:
+        tracker.set_detail("classifier", "Classificando via keywords e regras...")
     return _deterministic_classify(claims, sources, profiles)
 
 

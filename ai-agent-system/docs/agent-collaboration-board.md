@@ -93,21 +93,21 @@ Fase 4b: Frontend dashboard completo com API real.                     ✅
 Resumo atual:
 
 ```text
-Branches feat/backend-scores e feat/frontend-pages mergedados em main com zero conflito.
-Todas as 7 paginas do frontend consumindo API real.
-Profile permanece mock (baixa prioridade).
-Proximo foco: Fase 5 — persistencia SQLite completa + deploy.
+Pipeline em background estabilizado na main.
+Backend FastAPI, SQLite/Alembic, LangGraph, RAG NVIDIA e frontend /pipeline validados juntos por testes automatizados e build.
+A pagina /pipeline agora mostra steps reais via GET /runs/{id}; VITE_API_BASE_URL e respeitado no frontend.
+Profile permanece mock (baixa prioridade); producao ainda pede worker/fila e PostgreSQL.
 ```
 
 Ultima atualizacao:
 
 ```text
-2026-06-22 - Todas as fases 1-5 concluidas. Sistema funcional end-to-end.
+2026-06-29 - Codex corrigiu contrato de progresso do pipeline, persistencia de status terminal e validou pytest/build/alembic.
 ```
 Proxima verificacao sugerida:
 
 ```text
-Quando Codex ou Opencode iniciar uma tarefa nova, atualizar esta secao com o que esta em andamento.
+Subir backend + frontend localmente e fazer smoke test manual com uma query real autorizada, observando progresso por step e recomendacoes.
 ```
 
 ## Acao necessaria do usuario
@@ -171,7 +171,7 @@ Status: concluido por Codex.
 Objetivo atual:
 
 ```text
-Branch feat/frontend-pages: Startup Detail, Briefing e Contacts migradas para API real; Profile permanece mock; sem backend nesta branch.
+Estabilizar UX do pipeline em background: contrato de steps, persistencia final, testes assincronos, README e validacoes.
 ```
 ## Arquivos reservados
 
@@ -334,3 +334,4 @@ cd ai-agent-system
 - 2026-06-20: skill `firecrawl-skill` criada, README atualizado com setup de env/API keys/safety switch, Relatorio de Progresso atualizado, Handoff atualizado, .env.example atualizado com firecrawl provider options, Obsidian note "Firecrawl Setup.md" criada.
 - 2026-06-20: PlaywrightPageAdapter implementado (Chromium headless + trafilatura). `settings.py`, `provider_factory.py`, `provider_preflight.py` atualizados. 9 novos testes. pytest 77 passed, ruff ok.
 - 2026-06-20: LLM adapter system implementado (Groq primario + OpenAI/Gemini fallback). `src/radar/llm/` criado com adapters e prompts. Extractor e Classifier com LLM + fallback deterministico. 15 novos testes. pytest 92 passed, ruff ok. Handoff, Relatorio, README, Obsidian atualizados.
+- 2026-06-29: Codex estabilizou progresso real do pipeline em background, corrigiu status terminal/persistencia SQLite, alinhou frontend `completed -> done`, validou `ruff`, `pip check`, `pytest 155 passed`, `npm run build`, Alembic upgrade/downgrade e smoke backend+frontend `/pipeline`.

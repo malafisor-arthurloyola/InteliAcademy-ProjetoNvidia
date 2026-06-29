@@ -3,6 +3,7 @@ from __future__ import annotations
 import unicodedata
 from typing import Any, cast, get_args
 
+from radar.graph.progress import get_tracker
 from radar.graph.state import RadarState
 from radar.rag.retriever import ensure_seeded, retrieve
 from radar.schemas import NvidiaKnowledgeChunk
@@ -22,7 +23,7 @@ QUERY_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
     ),
     (
         ("llm", "generativa", "generative", "chatbot", "assistente", "assistant"),
-        "generative AI LLM NVIDIA NIM NVIDIA NeMo TensorRT-LLM",
+        "generative AI LLM NVIDIA NIM NVIDIA NeMo NeMo Guardrails TensorRT-LLM",
     ),
     (
         ("agente", "agents", "agent", "workflow", "guardrail", "governanca", "governance"),
@@ -87,8 +88,13 @@ def retrieve_nvidia_context(state: RadarState) -> list[NvidiaKnowledgeChunk]:
     if not query:
         return []
 
+    tracker = get_tracker()
+    if tracker:
+        tracker.set_detail("nvidia_rag", "Carregando modelo de embeddings (sentence-transformers)...")
     ensure_seeded()
-    results = retrieve(query, top_k=5)
+    if tracker:
+        tracker.set_detail("nvidia_rag", "Buscando conhecimento NVIDIA no Qdrant...")
+    results = retrieve(query, top_k=8)
 
     chunks: list[NvidiaKnowledgeChunk] = []
     for result in results:
@@ -109,6 +115,12 @@ def retrieve_nvidia_context(state: RadarState) -> list[NvidiaKnowledgeChunk]:
                 content=_as_text(result.get("content")),
                 relevance_score=score,
             )
+        )
+
+    if tracker:
+        tracker.set_detail(
+            "nvidia_rag",
+            f"Encontrados {len(chunks)} chunks NVIDIA relevantes"
         )
 
     return chunks

@@ -4,6 +4,92 @@ Plataforma multiagente para encontrar startups brasileiras com sinais de IA, cla
 
 **Toph** (codinome do frontend) — nome inspirado no personagem Avatar que sente vibrações na terra, como o radar sente sinais de IA nas startups.
 
+## Como inicializar localmente
+
+> Use PowerShell no Windows. Sempre use o Python do venv do projeto para o backend.
+
+### 1. Backend FastAPI
+
+Abra um terminal na raiz do repositorio e rode:
+
+```powershell
+cd C:\Users\Inteli\Desktop\Ligas\InteliAcademy\ProjetoNvidia\InteliAcademy-ProjetoNvidia\ai-agent-system
+$env:PYTHONPATH="src"
+..\venv\Scripts\python.exe -m uvicorn radar.api.app:app --host 127.0.0.1 --port 8000
+```
+
+Cheque se a API subiu:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/health
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/health/db
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/providers/preflight
+```
+
+Se a porta `8000` estiver presa por um processo antigo, use temporariamente `8001`:
+
+```powershell
+cd C:\Users\Inteli\Desktop\Ligas\InteliAcademy\ProjetoNvidia\InteliAcademy-ProjetoNvidia\ai-agent-system
+$env:PYTHONPATH="src"
+..\venv\Scripts\python.exe -m uvicorn radar.api.app:app --host 127.0.0.1 --port 8001
+```
+
+Observacoes:
+
+- O startup da API roda as migrations Alembic automaticamente quando `alembic.ini` existe.
+- Nao commite `.env`, banco SQLite runtime, caches, `venv` ou `node_modules`.
+- Para dados reais com Firecrawl/LLMs, configure apenas no `.env` local e confirme que `GET /providers/preflight` esta `ready`.
+- Sem providers externos, o sistema continua com fixtures/mocks deterministicos para teste.
+
+### 2. Frontend React
+
+Em outro terminal, rode:
+
+```powershell
+cd C:\Users\Inteli\Desktop\Ligas\InteliAcademy\ProjetoNvidia\InteliAcademy-ProjetoNvidia\frontend
+$env:VITE_API_BASE_URL="http://127.0.0.1:8000"
+npm run dev
+```
+
+Abra a URL exibida pelo Vite, normalmente:
+
+```text
+http://127.0.0.1:5173/
+```
+
+Se o backend estiver rodando na porta `8001`, inicie o frontend apontando para ela:
+
+```powershell
+cd C:\Users\Inteli\Desktop\Ligas\InteliAcademy\ProjetoNvidia\InteliAcademy-ProjetoNvidia\frontend
+$env:VITE_API_BASE_URL="http://127.0.0.1:8001"
+npm run dev
+```
+
+### 3. Teste rapido do pipeline pelo backend
+
+Com o backend rodando, voce pode disparar uma busca sem depender do frontend:
+
+```powershell
+$body = @{ query = "gupy" } | ConvertTo-Json
+Invoke-WebRequest -UseBasicParsing -Uri http://127.0.0.1:8000/runs -Method POST -ContentType "application/json" -Body $body
+```
+
+A resposta deve trazer `run_id`. Depois acompanhe:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8000/runs/1
+```
+
+Use o `run_id` retornado no lugar de `1`.
+
+### 4. Validacoes uteis
+
+```powershell
+cd C:\Users\Inteli\Desktop\Ligas\InteliAcademy\ProjetoNvidia\InteliAcademy-ProjetoNvidia\ai-agent-system
+..\venv\Scripts\python.exe -m pip check
+..\venv\Scripts\python.exe -m ruff check src/radar tests
+..\venv\Scripts\python.exe -m pytest
+```
 ---
 
 ## Stack

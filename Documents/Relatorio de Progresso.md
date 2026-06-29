@@ -1488,3 +1488,71 @@ README reescrito do zero com fluxograma Mermaid, status atualizado (Fases 1-5 co
 4. Feature: Score range slider no ranking
 5. Produção: Docker, PostgreSQL, deploy
 ```
+
+---
+
+## 2026-06-29 (Estabilizacao de UX do pipeline e validacao end-to-end)
+
+### Problema registrado
+
+O site estava visualmente funcional, mas a pagina `/pipeline` deixava o usuario no escuro: a API tinha sido movida para execucao em background, enquanto partes dos testes e do frontend ainda assumiam execucao sincrona ou estados antigos. Isso causava tres sintomas principais:
+
+- `POST /runs` retornava rapido, mas o frontend nao traduzia corretamente steps `completed` para o estado visual `done`.
+- O run podia ser marcado como `completed` antes de terminar de persistir fontes, claims e recomendacoes, criando lock no SQLite durante testes.
+- O README citava `VITE_API_BASE_URL`, mas o client estava fixo em `http://localhost:8000`.
+
+### O que foi corrigido
+
+- `/pipeline` agora usa os steps reais de `GET /runs/{id}` e mapeia status do backend para status visual do componente.
+- Ordem visual dos steps alinhada ao LangGraph real: `search_planner -> scraper -> extractor -> validator -> classifier -> nvidia_rag -> recommendation -> briefing`.
+- `run_steps` ganhou indice unico por `run_id + step_key`, evitando duplicidade de progresso.
+- `completed_at` de runs agora so e preenchido em estados terminais (`completed` ou `failed`).
+- `_persist_run_result()` agora marca o run como `completed` apenas depois de salvar startup, fontes, claims, validacao e recomendacoes.
+- Frontend passou a respeitar `VITE_API_BASE_URL`, mantendo fallback em `http://localhost:8000`.
+- Testes da API foram ajustados para o comportamento assincrono: criam o run, fazem polling e so depois validam fontes/claims.
+- RAG NVIDIA teve recall ampliado para reduzir falso negativo em `NeMo Guardrails` nas consultas LLM/generativas.
+- README atualizado com comandos claros para iniciar backend e frontend.
+
+### Arquivos principais alterados
+
+```text
+README.md
+ai-agent-system/src/radar/api/app.py
+ai-agent-system/src/radar/database/repository.py
+ai-agent-system/src/radar/database/alembic/versions/0002_add_run_steps_table.py
+ai-agent-system/src/radar/graph/progress.py
+ai-agent-system/src/radar/graph/builder.py
+ai-agent-system/src/radar/agents/nvidia_rag.py
+ai-agent-system/tests/test_api_crud.py
+frontend/src/lib/api.ts
+frontend/src/routes/pipeline.tsx
+frontend/src/components/pipeline-status.tsx
+```
+
+### Validacoes executadas
+
+```text
+ruff check src/radar tests -> All checks passed.
+pip check -> No broken requirements found.
+pytest -q -> 155 passed, 2 warnings conhecidos.
+npm run build -> OK.
+alembic upgrade head -> OK.
+alembic downgrade -1 -> OK.
+alembic upgrade head -> OK.
+Backend Uvicorn smoke (/ /health /health/db /providers/preflight) -> OK em porta temporaria 8010.
+Frontend Vite smoke (/pipeline via curl -I) -> HTTP 200 em porta temporaria 5176.
+```
+
+### Aprendizado importante
+
+Em pipeline assincrono, o status `completed` precisa significar "tudo que a UI vai ler ja foi persistido". Se o backend marca como concluido antes de terminar os inserts, o frontend e os testes podem acreditar que o run acabou enquanto o SQLite ainda esta em uso.
+
+### Proximos passos sugeridos
+
+```text
+1. Fazer smoke test manual com backend e frontend rodando juntos usando VITE_API_BASE_URL.
+2. Se o tempo inicial do RAG incomodar, expor mensagem clara de warm-up ou pre-carregamento na UI.
+3. Para producao, trocar thread local por worker/fila persistente e migrar SQLite para PostgreSQL.
+4. Revisar warnings conhecidos: Starlette TestClient/httpx2 e google.generativeai deprecated.
+```
+
