@@ -99,8 +99,11 @@ function Overview() {
   }, [startupRecords, runs]);
 
   const onAnalyze = () => {
-    const match = top.find((s) => s.name.toLowerCase().includes(q.toLowerCase())) ?? top[0];
-    if (match) navigate({ to: "/startup/$id", params: { id: match.id } });
+    const query = q.trim();
+    navigate({
+      to: "/pipeline",
+      search: query ? { query, autoRun: true } : {},
+    });
   };
 
   const error = healthError ?? startupsError;

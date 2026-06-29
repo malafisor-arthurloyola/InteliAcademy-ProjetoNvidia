@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,17 @@ import { ApiErrorDisplay } from "@/components/api-error-display";
 import { Sparkles, ArrowRight } from "lucide-react";
 import type { PipelineStepRecord } from "@/lib/api";
 
+type PipelineSearch = {
+  query?: string;
+  autoRun?: boolean;
+};
+
 export const Route = createFileRoute("/pipeline")({
-  head: () => ({ meta: [{ title: "Pipeline Multiagente — NVIDIA Toph" }] }),
+  validateSearch: (search: Record<string, unknown>): PipelineSearch => ({
+    query: typeof search.query === "string" ? search.query : undefined,
+    autoRun: search.autoRun === true || search.autoRun === "true",
+  }),
+  head: () => ({ meta: [{ title: "Pipeline Multiagente - NVIDIA Toph" }] }),
   component: PipelinePage,
 });
 
@@ -43,11 +52,13 @@ function mapStepStatus(status: PipelineStepRecord["status"]): PipelineStepData["
 }
 
 function PipelinePage() {
+  const search = Route.useSearch();
   const [query, setQuery] = useState("");
   const [runId, setRunId] = useState<number | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const autoRunRef = useRef<string | null>(null);
 
   const { mutate: execute, isPending: isSubmitting, error: submitError } = useSubmitRun();
   const { data: runDetail, isLoading: isPolling, error: pollError } = useRun(runId);
@@ -107,15 +118,17 @@ function PipelinePage() {
 
   const displayError = submitError ?? pollError ?? null;
 
-  const handleSubmit = () => {
-    if (!query.trim()) {
+  const executePipeline = useCallback((rawQuery: string) => {
+    const nextQuery = rawQuery.trim();
+    if (!nextQuery) {
       toast.error("Digite uma consulta para executar o pipeline.");
       return;
     }
+    setQuery(nextQuery);
     setRunId(null);
     setStartedAt(Date.now());
     setElapsed(0);
-    execute(query.trim(), {
+    execute(nextQuery, {
       onSuccess: (res) => {
         setRunId(res.run_id);
         toast.success("Pipeline iniciado!");
@@ -127,7 +140,20 @@ function PipelinePage() {
         toast.error(msg);
       },
     });
-  };
+  }, [execute]);
+
+  useEffect(() => {
+    const incomingQuery = search.query?.trim();
+    if (!incomingQuery) return;
+
+    setQuery(incomingQuery);
+    if (search.autoRun && autoRunRef.current !== incomingQuery && !isRunning && !runId) {
+      autoRunRef.current = incomingQuery;
+      executePipeline(incomingQuery);
+    }
+  }, [executePipeline, isRunning, runId, search.autoRun, search.query]);
+
+  const handleSubmit = () => executePipeline(query);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5 p-4 md:p-6">
