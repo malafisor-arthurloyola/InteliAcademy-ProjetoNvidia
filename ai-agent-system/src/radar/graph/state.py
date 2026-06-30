@@ -23,6 +23,7 @@ class RadarState(TypedDict, total=False):
     mode: str
     search_plan: SearchPlan
     sources: list[SourceDocument]
+    candidates: list[dict[str, str]]
     extracted_startups: list[StartupProfile]
     claims: list[EvidenceClaim]
     validation: EvidenceValidationReport

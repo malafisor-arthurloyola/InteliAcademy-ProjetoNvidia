@@ -14,6 +14,51 @@ from radar.graph.progress import get_tracker
 from radar.graph.state import RadarState
 
 
+def candidate_extractor_node(state: RadarState) -> dict[str, Any]:
+    import re
+    from urllib.parse import urlparse
+
+    seen: set[str] = set()
+    candidates: list[dict[str, str]] = []
+    query = state.get("query", "")
+
+    STARTUP_PATTERNS = [
+        re.compile(r"(?:startup|empresa|plataforma)\s+([A-Z][A-Za-z0-9]+(?:\s[A-Z][A-Za-z0-9]+)?)\s+(?:recebe|levanta|anuncia|fecha|conquista|lanca)"),
+        re.compile(r"([A-Z][A-Za-z0-9]+(?:\s[A-Z][A-Za-z0-9]+)?)\s+(?:recebe|levanta|anuncia\s+.*?funding|fecha\s+.*?seed)"),
+        re.compile(r"Crunchbase[:\s]+([A-Z][A-Za-z0-9]+(?:[-\s][A-Z][A-Za-z0-9]+)?)"),
+    ]
+    DOMAIN_BLOCKLIST = {"youtube", "instagram", "facebook", "twitter", "linkedin", "wikipedia", "reddit"}
+
+    for src in state.get("sources", []):
+        title = getattr(src, "title", "") or str(getattr(src, "url", ""))
+        snippet = getattr(src, "snippet", "") or ""
+        body = getattr(src, "text", "") or ""
+        combined = f"{title} {snippet} {body[:500]}"
+
+        for pattern in STARTUP_PATTERNS:
+            for match in pattern.finditer(combined):
+                name = match.group(1).strip()
+                if len(name) >= 3 and name.lower() not in seen:
+                    seen.add(name.lower())
+                    candidates.append({"startup_name": name, "query": name, "source": str(getattr(src, "url", ""))})
+
+        domain = urlparse(str(getattr(src, "url", ""))).netloc.lower().removeprefix("www.")
+        domain_name = domain.split(".")[0]
+        if domain_name not in DOMAIN_BLOCKLIST and len(domain_name) >= 4 and domain_name.lower() not in seen:
+            seen.add(domain_name.lower())
+            candidates.append({"startup_name": domain_name.capitalize(), "query": domain_name, "source": str(getattr(src, "url", ""))})
+
+    if not candidates and query.strip():
+        candidates.append({"startup_name": query.strip(), "query": query.strip(), "source": "query"})
+
+    tracker = get_tracker()
+    if tracker:
+        names = [c["startup_name"] for c in candidates[:8]]
+        tracker.set_detail("candidate_extractor", f"{len(candidates)} candidatos: {', '.join(names)}...")
+
+    return {"candidates": candidates}
+
+
 def search_planner_node(state: RadarState) -> dict[str, Any]:
     plan = plan_search(state["query"], state.get("startup_name"), mode=state.get("mode", "research"))
     tracker = get_tracker()

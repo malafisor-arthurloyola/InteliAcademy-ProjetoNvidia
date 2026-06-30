@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SourcesRouteImport } from './routes/sources'
 import { Route as RankingRouteImport } from './routes/ranking'
+import { Route as RadarRouteImport } from './routes/radar'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PipelineRouteImport } from './routes/pipeline'
 import { Route as ContactsRouteImport } from './routes/contacts'
@@ -26,6 +27,11 @@ const SourcesRoute = SourcesRouteImport.update({
 const RankingRoute = RankingRouteImport.update({
   id: '/ranking',
   path: '/ranking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RadarRoute = RadarRouteImport.update({
+  id: '/radar',
+  path: '/radar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/contacts': typeof ContactsRoute
   '/pipeline': typeof PipelineRoute
   '/profile': typeof ProfileRoute
+  '/radar': typeof RadarRoute
   '/ranking': typeof RankingRoute
   '/sources': typeof SourcesRoute
   '/startup/$id': typeof StartupIdRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/contacts': typeof ContactsRoute
   '/pipeline': typeof PipelineRoute
   '/profile': typeof ProfileRoute
+  '/radar': typeof RadarRoute
   '/ranking': typeof RankingRoute
   '/sources': typeof SourcesRoute
   '/startup/$id': typeof StartupIdRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/contacts': typeof ContactsRoute
   '/pipeline': typeof PipelineRoute
   '/profile': typeof ProfileRoute
+  '/radar': typeof RadarRoute
   '/ranking': typeof RankingRoute
   '/sources': typeof SourcesRoute
   '/startup/$id': typeof StartupIdRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/pipeline'
     | '/profile'
+    | '/radar'
     | '/ranking'
     | '/sources'
     | '/startup/$id'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/pipeline'
     | '/profile'
+    | '/radar'
     | '/ranking'
     | '/sources'
     | '/startup/$id'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/pipeline'
     | '/profile'
+    | '/radar'
     | '/ranking'
     | '/sources'
     | '/startup/$id'
@@ -129,6 +141,7 @@ export interface RootRouteChildren {
   ContactsRoute: typeof ContactsRoute
   PipelineRoute: typeof PipelineRoute
   ProfileRoute: typeof ProfileRoute
+  RadarRoute: typeof RadarRoute
   RankingRoute: typeof RankingRoute
   SourcesRoute: typeof SourcesRoute
   StartupIdRoute: typeof StartupIdRoute
@@ -148,6 +161,13 @@ declare module '@tanstack/react-router' {
       path: '/ranking'
       fullPath: '/ranking'
       preLoaderRoute: typeof RankingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/radar': {
+      id: '/radar'
+      path: '/radar'
+      fullPath: '/radar'
+      preLoaderRoute: typeof RadarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -201,6 +221,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactsRoute: ContactsRoute,
   PipelineRoute: PipelineRoute,
   ProfileRoute: ProfileRoute,
+  RadarRoute: RadarRoute,
   RankingRoute: RankingRoute,
   SourcesRoute: SourcesRoute,
   StartupIdRoute: StartupIdRoute,

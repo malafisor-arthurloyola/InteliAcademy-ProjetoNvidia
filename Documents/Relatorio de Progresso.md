@@ -1942,8 +1942,57 @@ f65bbd1 feat: batch endpoint, PlaywrightPool thread-local, Playwright warmup, da
 ### Próximos passos
 
 ```text
-1. [EM ANDAMENTO] Implementar Discovery Mode no SearchPlanner
-2. Adicionar página /batches no frontend (batch-frontend)
-3. Substituir classificador determinístico por LLM real (llm-classifier)
-4. PostgreSQL (postergado — SQLite suficiente para escala atual)
+1. [FINALIZADO] Discovery Mode com candidate_extractor (regex) no LangGraph
+2. [FINALIZADO] Frontend Radar page com textarea + batch progress
+3. Melhorar candidate_extractor: mais padrões, menos falsos positivos
+4. Substituir classificador determinístico por LLM real (llm-classifier)
+```
+
+---
+
+## 2026-06-30 — Candidate Extractor (LangGraph) + Frontend Radar
+
+### Resumo executivo
+
+Implementado modo descoberta completo com candidate_extractor como node LangGraph. O pipeline agora:
+1. Gera 10 queries de descoberta ✅
+2. Coleta 20+ fontes ✅
+3. Extrai candidatos dos títulos/domínios via regex (node LangGraph) ✅  
+4. Cria batch automático com os candidatos ✅
+5. Frontend Radar page com textarea + progresso em tempo real ✅
+
+### O que mudou
+
+**Backend:**
+- `graph/nodes.py`: novo `candidate_extractor_node()` — regex em titles, snippets e domínios para extrair nomes de startups
+- `graph/edges.py`: novo `route_after_scraper()` — desvia para `candidate_extractor` se `mode=="discovery"`
+- `graph/state.py`: adicionado campo `candidates: list[dict]`
+- `graph/builder.py`: adicionado node `candidate_extractor` + edge condicional pós-scraper
+- `api/app.py`: novo `POST /discover` — roda pipeline discovery, extrai candidatos, cria batch
+
+**Frontend:**
+- Novos arquivos: `routes/radar.tsx`, `lib/hooks/use-batch.ts`
+- API: `submitDiscover()`, `fetchBatch()`
+- Sidebar: link "Radar" na navegação principal
+
+### Teste real
+
+```text
+POST /discover?query="startup IA brasileira saude"
+→ 5 candidatos encontrados (Iabrasilnoticias, Abss, Legismap, ...)
+→ batch_id=4 criado
+→ 2/5 pipelines completadas em ~60s
+```
+
+### Problema conhecido
+
+Candidate extractor ainda gera falsos positivos ("Blog", "Startupsummit") por ser puramente regex. Precisa de:
+- Blacklist de palavras genéricas
+- Verificação de domínio (.com.br, .io, .ai)
+- Score mínimo de qualidade baseado no contexto da fonte
+
+### Commit
+
+```text
+(mesma branch feat/search-agent-discovery — commits acumulados)
 ```

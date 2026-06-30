@@ -8,6 +8,7 @@ import {
   Cpu,
   Handshake,
   UserCircle2,
+  Radio,
 } from "lucide-react";
 import {
   Sidebar,
@@ -25,6 +26,7 @@ import {
 const workspace = [
   { title: "Overview", url: "/", icon: LayoutDashboard },
   { title: "Ranking", url: "/ranking", icon: ListOrdered },
+  { title: "Radar", url: "/radar", icon: Radio },
   { title: "Contatos", url: "/contacts", icon: Handshake },
   { title: "Pipeline Multiagente", url: "/pipeline", icon: GitBranch },
   { title: "Fontes & Evidências", url: "/sources", icon: FileSearch },

@@ -5,9 +5,10 @@ from typing import Any, Callable
 
 from langgraph.graph import END, StateGraph
 
-from radar.graph.edges import route_after_classification, route_after_validation
+from radar.graph.edges import route_after_classification, route_after_scraper, route_after_validation
 from radar.graph.nodes import (
     briefing_node,
+    candidate_extractor_node,
     classifier_node,
     extractor_node,
     nvidia_rag_node,
@@ -22,6 +23,7 @@ from radar.graph.state import RadarState
 STEP_KEYS = {
     search_planner_node: "search_planner",
     scraper_node: "scraper",
+    candidate_extractor_node: "candidate_extractor",
     extractor_node: "extractor",
     classifier_node: "classifier",
     validator_node: "validator",
@@ -57,6 +59,7 @@ def build_graph():
 
     graph.add_node("search_planner", _with_progress(search_planner_node))
     graph.add_node("scraper", _with_progress(scraper_node))
+    graph.add_node("candidate_extractor", _with_progress(candidate_extractor_node))
     graph.add_node("extractor", _with_progress(extractor_node))
     graph.add_node("validator", _with_progress(validator_node))
     graph.add_node("classifier", _with_progress(classifier_node))
@@ -66,7 +69,15 @@ def build_graph():
 
     graph.set_entry_point("search_planner")
     graph.add_edge("search_planner", "scraper")
-    graph.add_edge("scraper", "extractor")
+    graph.add_conditional_edges(
+        "scraper",
+        route_after_scraper,
+        {
+            "candidate_extractor": "candidate_extractor",
+            "extractor": "extractor",
+        },
+    )
+    graph.add_edge("candidate_extractor", "extractor")
     graph.add_edge("extractor", "validator")
     graph.add_conditional_edges(
         "validator",

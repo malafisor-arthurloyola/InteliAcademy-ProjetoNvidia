@@ -4,6 +4,12 @@ from radar.graph.retry_policy import should_retry_collection
 from radar.graph.state import RadarState
 
 
+def route_after_scraper(state: RadarState) -> str:
+    if state.get("mode") == "discovery":
+        return "candidate_extractor"
+    return "extractor"
+
+
 def route_after_validation(state: RadarState) -> str:
     validation = state.get("validation")
     if validation and validation.has_minimum_evidence:

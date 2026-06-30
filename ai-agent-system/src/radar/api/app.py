@@ -359,6 +359,50 @@ def run_batch(payload: BatchRequest) -> dict[str, Any]:
     return jsonable_encoder({"batch_id": batch_id, "status": "running", "total": len(items)})
 
 
+class DiscoverRequest(BaseModel):
+    query: str
+    max_candidates: int = 10
+    concurrency: int = 4
+
+
+@app.post("/discover")
+def discover_startups(payload: DiscoverRequest) -> dict[str, Any]:
+    from radar.graph.builder import build_graph
+    from radar.database.repository import create_batch
+
+    query = payload.query.strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="query must not be empty")
+
+    graph = build_graph()
+    result: dict[str, Any] = graph.invoke({
+        "query": query,
+        "mode": "discovery",
+        "collection_attempts": 0,
+    })
+
+    candidates = result.get("candidates", [])[:payload.max_candidates]
+    if not candidates:
+        return jsonable_encoder({"query": query, "candidates": [], "batch_id": None, "status": "no_candidates"})
+
+    items = [{"startup_name": c["startup_name"], "query": c["query"]} for c in candidates]
+    batch_id = create_batch(items)
+
+    threading.Thread(
+        target=_run_batch_background,
+        args=(batch_id, items, payload.concurrency),
+        daemon=True,
+    ).start()
+
+    return jsonable_encoder({
+        "query": query,
+        "candidates": candidates,
+        "batch_id": batch_id,
+        "status": "running",
+        "total": len(candidates),
+    })
+
+
 @app.get("/batches/{batch_id}")
 def get_batch_status(batch_id: int) -> dict[str, Any]:
     from radar.database.repository import get_batch

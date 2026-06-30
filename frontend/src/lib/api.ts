@@ -273,3 +273,50 @@ export function submitRun(
     }),
   });
 }
+
+export interface DiscoverResponse {
+  query: string;
+  candidates: { startup_name: string; query: string; source: string }[];
+  batch_id: number | null;
+  status: string;
+  total: number;
+}
+
+export interface BatchResponse {
+  id: number;
+  status: string;
+  total: number;
+  completed: number;
+  failed: number;
+  created_at: string;
+  completed_at: string | null;
+  items: BatchItemResponse[];
+}
+
+export interface BatchItemResponse {
+  id: number;
+  batch_id: number;
+  startup_name: string;
+  query: string;
+  run_id: number | null;
+  status: string;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export function submitDiscover(
+  query: string,
+  max_candidates: number = 10,
+): Promise<DiscoverResponse> {
+  return request<DiscoverResponse>("/discover", {
+    method: "POST",
+    body: JSON.stringify({ query, max_candidates }),
+  });
+}
+
+export function fetchBatch(
+  batchId: number,
+): Promise<BatchResponse> {
+  return request<BatchResponse>(`/batches/${batchId}`);
+}
