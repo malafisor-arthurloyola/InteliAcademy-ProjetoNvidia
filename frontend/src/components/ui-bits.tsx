@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import type { AIMaturity } from "@/lib/mock-data";
@@ -76,14 +77,41 @@ export function CompanyLogo({
   name,
   size = "sm",
   className,
+  domain: explicitDomain,
 }: {
   id: string;
   name: string;
   size?: keyof typeof SIZE_MAP;
   className?: string;
+  domain?: string;
 }) {
-  const { brandColor } = getCompanyExtras(id);
+  const { brandColor, domain: extrasDomain } = getCompanyExtras(id, name);
+  const domain = explicitDomain ?? extrasDomain;
   const initials = initialsFor(name);
+  const logoUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+  const [imgError, setImgError] = useState(false);
+
+  if (!imgError) {
+    return (
+      <div
+        className={cn(
+          "grid shrink-0 place-items-center overflow-hidden rounded-md",
+          SIZE_MAP[size],
+          className,
+        )}
+        aria-label={name}
+        role="img"
+      >
+        <img
+          src={logoUrl}
+          alt={name}
+          className="h-full w-full object-contain"
+          onError={() => setImgError(true)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(

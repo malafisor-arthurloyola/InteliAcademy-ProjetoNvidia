@@ -140,7 +140,7 @@ def _deterministic_classify(claims, sources, profiles) -> StartupClassification:
             label="AI-Native",
             confidence=min(combined / 6.0, 0.95),
             rationale=(
-                f"Strong AI-native signals detected: {_list_signals(all_text, AI_NATIVE_KEYWORDS)}. "
+                f"Sinais fortes de AI-Native detectados: {_list_signals(all_text, AI_NATIVE_KEYWORDS)}. "
                 f"Tecnologias citadas: {cited_technologies or 'nenhuma'}. "
                 f"Setor: {sector or 'nao identificado'}. "
                 f"Funding: {'sim' if has_funding else 'nao'}. "
@@ -155,7 +155,7 @@ def _deterministic_classify(claims, sources, profiles) -> StartupClassification:
             label="AI-Enabled",
             confidence=min(max(combined / 4.0, 0.5), 0.85),
             rationale=(
-                f"Public evidence suggests AI usage. "
+                f"Evidencias publicas sugerem uso de IA. "
                 f"Sinais AI-Enabled: {_list_signals(all_text, AI_ENABLED_KEYWORDS)}. "
                 f"Tecnologias citadas: {cited_technologies or 'nenhuma'}. "
                 f"Setor: {sector or 'nao identificado'}."

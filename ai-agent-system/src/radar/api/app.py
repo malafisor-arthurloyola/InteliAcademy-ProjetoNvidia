@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 import time
 from collections.abc import AsyncGenerator
@@ -10,18 +11,27 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from alembic.config import Config as AlembicConfig
-from alembic import command as alembic_command
-from fastapi import FastAPI, HTTPException
-from fastapi.encoders import jsonable_encoder
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+_src = str(Path(__file__).resolve().parent.parent.parent)
+if _src not in sys.path:
+    sys.path.insert(0, _src)
 
-from radar.database import (
+from alembic.config import Config as AlembicConfig  # noqa: E402
+from alembic import command as alembic_command  # noqa: E402
+from fastapi import FastAPI, HTTPException  # noqa: E402
+from fastapi.encoders import jsonable_encoder  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import StreamingResponse  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
+
+from radar.database import (  # noqa: E402
+    create_contact_discovery_run,
+    ensure_contact_discovery_steps_registered,
     get_all_runs,
     get_all_source_documents,
     get_all_startups,
+    get_contact_discovery_run,
+    get_contact_discovery_steps,
+    get_contacts_by_startup,
     get_run_by_id,
     get_run_evidence_claims,
     get_run_recommendations,
@@ -31,19 +41,22 @@ from radar.database import (
     get_runs_by_startup,
     get_startup_by_id,
     init_db,
+    save_contacts,
     save_evidence_claim,
     save_recommendation,
     save_run,
     save_source_document,
     save_startup,
     save_validation,
+    update_contact_discovery_status,
+    update_contact_discovery_step,
     update_run_startup,
     update_run_status,
 )
-from radar.database.connection import get_db_path
-from radar.graph.builder import build_graph
-from radar.graph.progress import PipelineTracker, set_tracker
-from radar.scraping.provider_preflight import inspect_provider_setup
+from radar.database.connection import get_db_path  # noqa: E402
+from radar.graph.builder import build_graph  # noqa: E402
+from radar.graph.progress import PipelineTracker, set_tracker  # noqa: E402
+from radar.scraping.provider_preflight import inspect_provider_setup  # noqa: E402
 
 
 _DB_DIR = Path(__file__).resolve().parent.parent / "database"
@@ -59,8 +72,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
             str(_DB_DIR / "alembic"),
         )
         alembic_command.upgrade(cfg, "head")
-    else:
-        init_db()
+    init_db()
 
     _prewarm_vector_store()
     yield
@@ -311,5 +323,88 @@ def list_startup_runs(startup_id: str) -> list[dict[str, Any]]:
     if not get_startup_by_id(startup_id):
         raise HTTPException(status_code=404, detail="Startup not found")
     return get_runs_by_startup(startup_id)
+
+
+@app.post("/startups/{startup_id}/contacts")
+def discover_startup_contacts(startup_id: str) -> dict[str, Any]:
+    startup = get_startup_by_id(startup_id)
+    if not startup:
+        raise HTTPException(status_code=404, detail="Startup not found")
+
+    existing = get_contacts_by_startup(startup_id)
+    if existing:
+        return jsonable_encoder({"startup_id": startup_id, "cached": True, "contacts": existing})
+
+    discovery_id = create_contact_discovery_run(startup_id)
+    ensure_contact_discovery_steps_registered(discovery_id)
+    update_contact_discovery_status(discovery_id, "running")
+
+    threading.Thread(
+        target=_run_contact_discovery_background,
+        args=(discovery_id, startup_id, startup["name"]),
+        daemon=True,
+    ).start()
+
+    return jsonable_encoder({"startup_id": startup_id, "discovery_id": discovery_id, "status": "running"})
+
+
+def _run_contact_discovery_background(discovery_id: int, startup_id: str, startup_name: str) -> None:
+    from radar.agents.contact_discovery import discover_contacts
+    from radar.agents.contact_tracker import ContactDiscoveryTracker, set_contact_tracker
+
+    tracker = ContactDiscoveryTracker(discovery_id)
+    set_contact_tracker(tracker)
+    try:
+        result = discover_contacts(startup_id=startup_id, startup_name=startup_name)
+        save_contacts(startup_id, result.model_dump())
+        update_contact_discovery_status(discovery_id, "completed")
+    except Exception as exc:
+        import logging
+        logging.getLogger("radar").error("Contact discovery %d failed: %s", discovery_id, exc)
+        update_contact_discovery_status(discovery_id, "failed")
+        update_contact_discovery_step(discovery_id, "saving_result", "error", str(exc))
+    finally:
+        set_contact_tracker(None)
+
+
+@app.get("/startups/{startup_id}/contacts/stream")
+def stream_contact_discovery(startup_id: str):
+    run_data = get_contact_discovery_run(startup_id)
+    if not run_data:
+        raise HTTPException(status_code=404, detail="No contact discovery running")
+    discovery_id = run_data["id"]
+
+    def event_stream():
+        last_data: Any = None
+        while True:
+            steps = get_contact_discovery_steps(discovery_id)
+            if steps != last_data:
+                last_data = steps
+                yield f"data: {json.dumps(steps)}\n\n"
+            statuses = {s["status"] for s in steps}
+            if statuses == {"completed"} or ("error" in statuses and not statuses - {"completed", "error"}):
+                yield "event: done\ndata: {}\n\n"
+                break
+            time.sleep(0.5)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.get("/startups/{startup_id}/contacts")
+def get_startup_contacts(startup_id: str) -> dict[str, Any]:
+    if not get_startup_by_id(startup_id):
+        raise HTTPException(status_code=404, detail="Startup not found")
+    contacts = get_contacts_by_startup(startup_id)
+    if not contacts:
+        return {"startup_id": startup_id, "emails": [], "phones": [], "linkedin_urls": [], "addresses": [], "raw_text_snippets": []}
+    return contacts
 
 

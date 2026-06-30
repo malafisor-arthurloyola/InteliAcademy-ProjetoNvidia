@@ -19,6 +19,7 @@ export interface GrowthPoint {
 
 export interface CompanyExtras {
   brandColor: string; // hex
+  domain: string;
   contact: CompanyContact;
   growth: GrowthPoint[];
 }
@@ -43,6 +44,7 @@ function genGrowth(seed: number, base: number): GrowthPoint[] {
 export const companyExtras: Record<string, CompanyExtras> = {
   neurabra: {
     brandColor: "#0EA5E9",
+    domain: "neurabra.ai",
     contact: {
       email: "partnerships@neurabra.ai",
       phone: "+55 11 4002-8922",
@@ -55,6 +57,7 @@ export const companyExtras: Record<string, CompanyExtras> = {
   },
   "vortex-vision": {
     brandColor: "#8B5CF6",
+    domain: "vortexvision.com.br",
     contact: {
       email: "contato@vortexvision.com.br",
       phone: "+55 48 3025-7711",
@@ -67,6 +70,7 @@ export const companyExtras: Record<string, CompanyExtras> = {
   },
   agroflow: {
     brandColor: "#10B981",
+    domain: "agroflow.farm",
     contact: {
       email: "comercial@agroflow.farm",
       phone: "+55 16 3621-4040",
@@ -79,6 +83,7 @@ export const companyExtras: Record<string, CompanyExtras> = {
   },
   "lumini-health": {
     brandColor: "#EC4899",
+    domain: "luminihealth.com.br",
     contact: {
       email: "research@luminihealth.com.br",
       phone: "+55 51 3333-9090",
@@ -91,6 +96,7 @@ export const companyExtras: Record<string, CompanyExtras> = {
   },
   "polyglot-voice": {
     brandColor: "#F59E0B",
+    domain: "polyglotvoice.io",
     contact: {
       email: "hello@polyglotvoice.io",
       phone: "+55 21 4042-1180",
@@ -103,6 +109,7 @@ export const companyExtras: Record<string, CompanyExtras> = {
   },
   "quanta-logix": {
     brandColor: "#EF4444",
+    domain: "quantalogix.com.br",
     contact: {
       email: "rfp@quantalogix.com.br",
       phone: "+55 41 3022-5500",
@@ -115,6 +122,7 @@ export const companyExtras: Record<string, CompanyExtras> = {
   },
   "ferra-secure": {
     brandColor: "#0F172A",
+    domain: "ferrasecure.io",
     contact: {
       email: "sales@ferrasecure.io",
       phone: "+55 31 4002-0707",
@@ -127,6 +135,7 @@ export const companyExtras: Record<string, CompanyExtras> = {
   },
   omnigen: {
     brandColor: "#76B900",
+    domain: "omnigen.studio",
     contact: {
       email: "studios@omnigen.studio",
       phone: "+55 11 5040-3300",
@@ -139,10 +148,11 @@ export const companyExtras: Record<string, CompanyExtras> = {
   },
 };
 
-export function getCompanyExtras(id: string): CompanyExtras {
+export function getCompanyExtras(id: string, name?: string): CompanyExtras {
   return (
     companyExtras[id] ?? {
       brandColor: "#64748B",
+      domain: (name || id).toLowerCase().replace(/[^a-z0-9]/g, "") + ".com.br",
       contact: {
         email: "contato@empresa.com",
         phone: "+55 00 0000-0000",

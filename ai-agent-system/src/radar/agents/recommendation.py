@@ -6,138 +6,157 @@ from radar.graph.state import RadarState
 from radar.schemas import NvidiaKnowledgeChunk, NvidiaRecommendation, TechnicalGap
 
 
-TECHNOLOGY_GUIDANCE = {
+TECHNOLOGY_GUIDANCE: dict[str, dict[str, str]] = {
     "NVIDIA Inception": {
-        "gap": "Startup needs ecosystem validation and structured NVIDIA startup support.",
-        "technical": "Inception can connect the startup to NVIDIA technical resources and ecosystem guidance while the AI stack matures.",
-        "business": "The program supports startup nurturing, community access, and go-to-market alignment.",
+        "gap": "Startup precisa de validacao do ecossistema e suporte estruturado da NVIDIA.",
+        "technical": "Inception conecta a startup a recursos tecnicos NVIDIA e orientacao do ecossistema enquanto o stack de IA amadurece.",
+        "business": "O programa oferece suporte a startups, acesso a comunidade e alinhamento de go-to-market.",
         "priority": "medium",
         "complexity": "low",
-        "action": "Review public evidence and evaluate fit for NVIDIA Inception outreach.",
+        "action": "Revisar evidencias publicas e avaliar adesao para outreach do NVIDIA Inception.",
     },
     "NVIDIA NIM": {
-        "gap": "Validated LLM or agent workflow may need optimized deployment beyond generic API usage.",
-        "technical": "NIM can package optimized inference microservices for generative AI workloads.",
-        "business": "Optimized inference can reduce deployment friction and support scalable AI-native services.",
+        "gap": "Workflow de LLM ou agente validado pode precisar de deploy otimizado alem do uso generico de API.",
+        "technical": "NIM empacota microsservicos de inferencia otimizados para workloads de IA generativa.",
+        "business": "Inferencia otimizada reduz atrito de deploy e suporta servicos AI-native escalaveis.",
         "priority": "high",
         "complexity": "medium",
-        "action": "Assess current model deployment path and benchmark NIM for the validated AI workflow.",
+        "action": "Avaliar caminho atual de deploy de modelo e comparar com NIM para o workflow de IA validado.",
     },
     "NeMo Guardrails": {
-        "gap": "Validated AI agent or customer workflow may need behavior control and governance.",
-        "technical": "NeMo Guardrails can constrain assistant behavior and add policy controls around agent interactions.",
-        "business": "Governed agents reduce operational risk for customer-facing or workflow-critical automation.",
+        "gap": "Agente de IA ou workflow de cliente validado pode precisar de controle de comportamento e governanca.",
+        "technical": "NeMo Guardrails pode restringir comportamento de assistentes e adicionar controles de politica em interacoes de agentes.",
+        "business": "Agentes governados reduzem risco operacional para automacao voltada ao cliente ou critica para workflow.",
         "priority": "high",
         "complexity": "medium",
-        "action": "Identify risky agent flows and prototype guardrails for the highest-impact interaction.",
+        "action": "Identificar fluxos de risco de agentes e prototipar guardrails para a interacao de maior impacto.",
     },
     "NVIDIA Triton Inference Server": {
-        "gap": "Production AI workflow may need scalable model serving and latency control.",
-        "technical": "Triton standardizes production inference serving and supports scalable deployment patterns.",
-        "business": "Better serving infrastructure can improve reliability, latency, and cost predictability.",
+        "gap": "Workflow de IA em producao pode precisar de serving escalavel e controle de latencia.",
+        "technical": "Triton padroniza serving de inferencia em producao e suporta padroes de deploy escalaveis.",
+        "business": "Infraestrutura de serving melhorada pode aumentar confiabilidade, latencia e previsibilidade de custos.",
         "priority": "medium",
         "complexity": "medium",
-        "action": "Map production inference endpoints and evaluate Triton for serving standardization.",
+        "action": "Mapear endpoints de inferencia em producao e avaliar Triton para padronizacao de serving.",
     },
     "TensorRT-LLM": {
-        "gap": "LLM workload may need lower latency and higher throughput inference optimization.",
-        "technical": "TensorRT-LLM can optimize LLM inference performance with batching and low-latency serving techniques.",
-        "business": "Optimized LLM inference can reduce serving cost and improve responsiveness for AI products.",
+        "gap": "Workload de LLM pode precisar de otimizacao de inferencia com menor latencia e maior throughput.",
+        "technical": "TensorRT-LLM otimiza performance de inferencia de LLMs com tecnicas de batching e baixa latencia.",
+        "business": "Inferencia de LLM otimizada reduz custo de serving e melhora capacidade de resposta de produtos de IA.",
         "priority": "high",
         "complexity": "high",
-        "action": "Benchmark representative LLM prompts against TensorRT-LLM optimization paths.",
+        "action": "Testar prompts LLM representativos contra caminhos de otimizacao do TensorRT-LLM.",
     },
     "NVIDIA RAPIDS": {
-        "gap": "Data-heavy AI workflow may need faster analytics or feature pipeline processing.",
-        "technical": "RAPIDS accelerates data science and analytics pipelines on GPUs.",
-        "business": "Faster data pipelines can shorten experimentation cycles and reduce processing bottlenecks.",
+        "gap": "Workflow de IA com muitos dados pode precisar de analytics mais rapidos ou processamento de pipelines deFeatures.",
+        "technical": "RAPIDS acelera pipelines de ciencia de dados e analytics em GPUs.",
+        "business": "Pipelines de dados mais rapidos podem encurtar ciclos de experimentacao e reduzir gargalos de processamento.",
         "priority": "medium",
         "complexity": "medium",
-        "action": "Profile tabular or analytics workloads and identify a RAPIDS proof of concept.",
+        "action": "Perfil de workloads tabulares ou analytics e identificar um prova de conceito com RAPIDS.",
     },
     "cuDF": {
-        "gap": "Tabular or dataframe-heavy workflow may need faster preprocessing.",
-        "technical": "cuDF accelerates dataframe operations on GPUs and can reduce bottlenecks in tabular data preparation.",
-        "business": "Faster dataframe processing can improve iteration speed for analytics-heavy AI products.",
+        "gap": "Workload com muitos dataframes pode precisar de pre-processamento mais rapido.",
+        "technical": "cuDF acelera operacoes de dataframe em GPUs e pode reduzir gargalos na preparacao de dados tabulares.",
+        "business": "Processamento de dataframe mais rapido melhora velocidade de iteracao para produtos de IA com muitos analytics.",
         "priority": "medium",
         "complexity": "medium",
-        "action": "Identify dataframe-heavy jobs and compare pandas-style processing against cuDF.",
+        "action": "Identificar jobs com muitos dataframes e comparar processamento estilo pandas contra cuDF.",
     },
     "cuML": {
-        "gap": "Predictive machine learning workflow may need accelerated model training or experimentation.",
-        "technical": "cuML accelerates classical machine learning algorithms on GPUs.",
-        "business": "Accelerated model experimentation can shorten validation cycles for data-intensive startups.",
+        "gap": "Workflow de machine learning preditivo pode precisar de treinamento ou experimentacao acelerada de modelo.",
+        "technical": "cuML acelera algoritmos classicos de machine learning em GPUs.",
+        "business": "Experimentacao acelerada de modelos pode encurtar ciclos de validacao para startups intensivas em dados.",
         "priority": "medium",
         "complexity": "medium",
-        "action": "Review predictive ML workloads and select one cuML-compatible benchmark.",
+        "action": "Revisar workloads de ML preditivo e selecionar um benchmark compativel com cuML.",
     },
     "NVIDIA Riva": {
-        "gap": "Voice or transcription product may need production-grade speech AI capabilities.",
-        "technical": "Riva supports speech AI workloads such as ASR, TTS, and voice applications.",
-        "business": "Speech AI acceleration can improve user experience in call center, voice, or transcription workflows.",
+        "gap": "Produto de voz ou transcricao pode precisar de capacidades de speech AI de nivel de producao.",
+        "technical": "Riva suporta workloads de speech AI como ASR, TTS e aplicacoes de voz.",
+        "business": "Aceleracao de speech AI pode melhorar experiencia do usuario em call center, voz ou workflows de transcricao.",
         "priority": "medium",
         "complexity": "medium",
-        "action": "Validate speech workload requirements and evaluate Riva for ASR/TTS components.",
+        "action": "Validar requisitos de workload de voz e avaliar Riva para componentes ASR/TTS.",
     },
     "NVIDIA Clara": {
-        "gap": "Healthcare AI workflow may need domain-specific NVIDIA healthcare tooling.",
-        "technical": "Clara supports healthcare and life sciences AI workflows.",
-        "business": "Domain-aligned healthcare tooling can reduce adoption friction in regulated or clinical contexts.",
+        "gap": "Workflow de IA em saude pode precisar de ferramentas NVIDIA especificas do dominio de saude.",
+        "technical": "Clara suporta workflows de IA em saude e ciencias da vida.",
+        "business": "Ferramentas de saude alinhadas ao dominio reduzem atrito de adocao em contextos regulados ou clinicos.",
         "priority": "medium",
         "complexity": "high",
-        "action": "Review healthcare use case, compliance needs, and potential Clara alignment.",
+        "action": "Revisar caso de uso de saude, necessidades de compliance e alinhamento potencial com Clara.",
     },
     "NVIDIA Omniverse": {
-        "gap": "Simulation or digital twin workflow may need a stronger 3D collaboration and simulation layer.",
-        "technical": "Omniverse supports simulation, 3D workflows, and digital twins for industrial environments.",
-        "business": "Better simulation can reduce physical testing cost and speed up robotics or industrial validation.",
+        "gap": "Workflow de simulacao ou digital twin pode precisar de uma camada mais forte de colaboracao 3D e simulacao.",
+        "technical": "Omniverse suporta simulacao, workflows 3D e digital twins para ambientes industriais.",
+        "business": "Melhor simulacao pode reduzir custo de testes fisicos e acelerar validacao robotica ou industrial.",
         "priority": "medium",
         "complexity": "high",
-        "action": "Map simulation assets and evaluate where Omniverse could support digital twin workflows.",
+        "action": "Mapear ativos de simulacao e avaliar onde Omniverse pode suportar workflows de digital twin.",
     },
     "NVIDIA Isaac": {
-        "gap": "Robotics or autonomy workflow may need NVIDIA tooling for simulation and deployment.",
-        "technical": "Isaac supports robotics simulation, autonomy, and robot development workflows.",
-        "business": "Robotics-specific tooling can improve validation speed and reduce deployment risk.",
+        "gap": "Workflow de robotica ou autonomia pode precisar de ferramentas NVIDIA para simulacao e deploy.",
+        "technical": "Isaac suporta simulacao robotica, autonomia e workflows de desenvolvimento de robos.",
+        "business": "Ferramentas especificas de robotica podem melhorar velocidade de validacao e reduzir risco de deploy.",
         "priority": "medium",
         "complexity": "high",
-        "action": "Review robotics autonomy stack and identify a simulation or deployment proof of concept with Isaac.",
+        "action": "Revisar stack de autonomia robotica e identificar um prova de conceito de simulacao ou deploy com Isaac.",
     },
     "NVIDIA NeMo": {
-        "gap": "Generative AI workflow may need a structured path for customization, evaluation, and deployment readiness.",
-        "technical": "NeMo supports building, customizing, evaluating, and deploying generative AI models.",
-        "business": "A stronger generative AI lifecycle can help AI-native startups reduce model risk and improve product differentiation.",
+        "gap": "Workflow de IA generativa pode precisar de um caminho estruturado para customizacao, avaliacao e prontidao de deploy.",
+        "technical": "NeMo suporta construcao, customizacao, avaliacao e deploy de modelos de IA generativa.",
+        "business": "Um ciclo de vida de IA generativa mais forte ajuda startups AI-native a reduzir risco de modelo e melhorar diferenciacao de produto.",
         "priority": "high",
         "complexity": "medium",
-        "action": "Review the validated generative AI workflow and identify whether fine-tuning, evaluation, or model governance is the next bottleneck.",
+        "action": "Revisar workflow de IA generativa validado e identificar se fine-tuning, avaliacao ou governanca de modelo e o proximo gargalo.",
     },
     "CUDA": {
-        "gap": "GPU-heavy AI workload may need lower-level acceleration or optimization.",
-        "technical": "CUDA is the foundation for NVIDIA GPU acceleration across AI, HPC, analytics, and simulation workloads.",
-        "business": "GPU acceleration can improve performance and cost efficiency when workloads outgrow generic CPU-only execution.",
+        "gap": "Workload de IA pesado em GPU pode precisar de aceleracao ou otimizacao de baixo nivel.",
+        "technical": "CUDA e a fundacao para aceleracao NVIDIA GPU em IA, HPC, analytics e workloads de simulacao.",
+        "business": "Aceleracao GPU pode melhorar performance e eficiencia de custos quando workloads superam execucao generica apenas em CPU.",
         "priority": "medium",
         "complexity": "high",
-        "action": "Profile the validated workload and identify whether CUDA-backed libraries or custom kernels are warranted.",
+        "action": "Perfil do workload validado e identificar se bibliotecas CUDA ou kernels customizados sao recomendados.",
     },
     "NVIDIA Morpheus": {
-        "gap": "Cybersecurity AI workflow may need real-time threat detection or anomaly analysis.",
-        "technical": "Morpheus supports GPU-accelerated cybersecurity pipelines for telemetry, anomaly detection, and threat response.",
-        "business": "Real-time cybersecurity AI can improve detection speed and strengthen enterprise value propositions.",
+        "gap": "Workflow de IA em ciberseguranca pode precisar de deteccao de ameacas em tempo real ou analise de anomalias.",
+        "technical": "Morpheus suporta pipelines de ciberseguranca acelerados por GPU para telemetria, deteccao de anomalias e resposta a ameacas.",
+        "business": "IA de ciberseguranca em tempo real melhora velocidade de deteccao e fortalece propostas de valor empresariais.",
         "priority": "medium",
         "complexity": "high",
-        "action": "Map the cybersecurity data flow and evaluate whether Morpheus fits the validated detection workload.",
+        "action": "Mapear fluxo de dados de ciberseguranca e avaliar se Morpheus se adequa ao workload de deteccao validado.",
     },
     "NVIDIA AI Enterprise": {
-        "gap": "Production AI workflow may need enterprise-grade support, security, and stable deployment infrastructure.",
-        "technical": "NVIDIA AI Enterprise packages production AI software including NIM, Triton, RAPIDS, and enterprise support.",
-        "business": "Enterprise-grade AI infrastructure can reduce operational risk for startups selling into regulated or large-company environments.",
+        "gap": "Workflow de IA em producao pode precisar de suporte enterprise, seguranca e infraestrutura de deploy estavel.",
+        "technical": "NVIDIA AI Enterprise empacota software de IA de producao incluindo NIM, Triton, RAPIDS e suporte enterprise.",
+        "business": "Infraestrutura de IA de nivel enterprise reduz risco operacional para startups vendendo para ambientes regulados ou grandes empresas.",
         "priority": "medium",
         "complexity": "medium",
-        "action": "Assess production, security, and support requirements for enterprise customers and evaluate AI Enterprise fit.",
+        "action": "Avaliar requisitos de producao, seguranca e suporte para clientes enterprise e avaliar adesao ao AI Enterprise.",
     },
 }
 
 
+
+TECHNOLOGY_SECTORS: dict[str, set[str] | None] = {
+    "NVIDIA Clara": {"Healthcare", "Saude", "Life Sciences", "Ciencias da Vida"},
+    "NVIDIA Isaac": {"Robotics", "Robotica", "Industrial", "Manufacturing"},
+    "NVIDIA Omniverse": {"Industrial", "Manufacturing", "Robotics", "Simulation", "Gaming"},
+    "NVIDIA Riva": {"Voice AI", "Customer Service", "Call Center"},
+    "NVIDIA Morpheus": {"Cybersecurity", "Seguranca"},
+    "NVIDIA RAPIDS": None,
+    "cuDF": None,
+    "cuML": None,
+    "CUDA": None,
+    "NVIDIA NIM": None,
+    "NVIDIA NeMo": None,
+    "NeMo Guardrails": None,
+    "NVIDIA Triton Inference Server": None,
+    "TensorRT-LLM": None,
+    "NVIDIA AI Enterprise": None,
+    "NVIDIA Inception": None,
+}
 
 TECHNOLOGY_EVIDENCE_PATTERNS: dict[str, tuple[str, ...]] = {
     "NVIDIA Inception": ("ai", "ia", "startup", "empresa", "platform", "plataforma"),
@@ -171,9 +190,15 @@ def generate_recommendations(state: RadarState) -> tuple[list[TechnicalGap], lis
     gaps: list[TechnicalGap] = []
     recommendations: list[NvidiaRecommendation] = []
 
+    startup_sector = _detect_startup_sector(state)
+
     for chunk in nvidia_context:
         guidance = TECHNOLOGY_GUIDANCE.get(chunk.technology)
-        if not guidance or not _technology_supported(chunk.technology, evidence_text):
+        if not guidance:
+            continue
+        if not _technology_supported(chunk.technology, evidence_text):
+            continue
+        if not _sector_compatible(chunk.technology, startup_sector):
             continue
 
         gap = _build_gap(chunk, guidance["gap"], validation.supporting_evidence_ids)
@@ -242,3 +267,26 @@ def _normalize(text: str) -> str:
         .decode("ascii")
         .lower()
     )
+
+
+def _detect_startup_sector(state: RadarState) -> str | None:
+    profiles = state.get("extracted_startups", [])
+    if profiles and profiles[0].sector:
+        return profiles[0].sector
+    classification = state.get("classification")
+    if classification:
+        return getattr(classification, "sector", None)
+    return None
+
+
+def _sector_compatible(technology: str, startup_sector: str | None) -> bool:
+    allowed_sectors = TECHNOLOGY_SECTORS.get(technology)
+    if allowed_sectors is None:
+        return True
+    if startup_sector is None:
+        return False
+    normalized_sector = _normalize(startup_sector)
+    for allowed in allowed_sectors:
+        if _normalize(allowed) in normalized_sector:
+            return True
+    return False

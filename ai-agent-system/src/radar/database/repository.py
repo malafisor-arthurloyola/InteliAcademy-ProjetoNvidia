@@ -94,6 +94,42 @@ def init_db() -> None:
                 completed_at TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS contacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                startup_id TEXT NOT NULL REFERENCES startups(id),
+                emails TEXT DEFAULT '[]',
+                phones TEXT DEFAULT '[]',
+                linkedin_urls TEXT DEFAULT '[]',
+                addresses TEXT DEFAULT '[]',
+                primary_name TEXT,
+                primary_role TEXT,
+                raw_text_snippets TEXT DEFAULT '[]',
+                collected_at TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(startup_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS contact_discovery_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                startup_id TEXT UNIQUE NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                completed_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS contact_discovery_steps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                discovery_id INTEGER NOT NULL REFERENCES contact_discovery_runs(id),
+                step_key TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'idle',
+                detail TEXT,
+                error_message TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                UNIQUE(discovery_id, step_key)
+            );
+            CREATE INDEX IF NOT EXISTS idx_cd_steps_discovery ON contact_discovery_steps(discovery_id);
+
             CREATE INDEX IF NOT EXISTS idx_run_steps_run_id ON run_steps(run_id);
             CREATE UNIQUE INDEX IF NOT EXISTS idx_run_steps_run_step ON run_steps(run_id, step_key);
         """)
@@ -490,5 +526,186 @@ def get_startup_by_id(startup_id: str) -> dict[str, Any] | None:
             _STARTUP_SELECT + "WHERE s.id = ?", (startup_id,)
         ).fetchone()
         return dict(row) if row else None
+
+
+def save_contacts(startup_id: str, data: dict[str, Any]) -> int:
+    with get_connection() as conn:
+        existing = conn.execute(
+            "SELECT id FROM contacts WHERE startup_id = ?", (startup_id,)
+        ).fetchone()
+        if existing:
+            conn.execute(
+                """UPDATE contacts SET
+                    emails=?, phones=?, linkedin_urls=?, addresses=?,
+                    primary_name=?, primary_role=?, raw_text_snippets=?,
+                    collected_at=?
+                WHERE startup_id=?""",
+                (
+                    json.dumps(data.get("emails", [])),
+                    json.dumps(data.get("phones", [])),
+                    json.dumps(data.get("linkedin_urls", [])),
+                    json.dumps(data.get("addresses", [])),
+                    data.get("primary_name"),
+                    data.get("primary_role"),
+                    json.dumps(data.get("raw_text_snippets", [])),
+                    data.get("collected_at"),
+                    startup_id,
+                ),
+            )
+            return existing["id"]
+        cur = conn.execute(
+            """INSERT INTO contacts
+               (startup_id, emails, phones, linkedin_urls, addresses,
+                primary_name, primary_role, raw_text_snippets, collected_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                startup_id,
+                json.dumps(data.get("emails", [])),
+                json.dumps(data.get("phones", [])),
+                json.dumps(data.get("linkedin_urls", [])),
+                json.dumps(data.get("addresses", [])),
+                data.get("primary_name"),
+                data.get("primary_role"),
+                json.dumps(data.get("raw_text_snippets", [])),
+                data.get("collected_at"),
+            ),
+        )
+        return cur.lastrowid or 0
+
+
+def get_contacts_by_startup(startup_id: str) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM contacts WHERE startup_id = ?", (startup_id,)
+        ).fetchone()
+        if not row:
+            return None
+        result = dict(row)
+        for key in ("emails", "phones", "linkedin_urls", "addresses", "raw_text_snippets"):
+            value = result.get(key)
+            result[key] = json.loads(value) if isinstance(value, str) else []
+        return result
+
+
+_CONTACT_STEP_ORDER = [
+    "preparing_queries",
+    "searching_web",
+    "extracting_contacts",
+    "fallback_sources",
+    "cross_referencing",
+    "saving_result",
+]
+
+
+def create_contact_discovery_run(startup_id: str) -> int:
+    with get_connection() as conn:
+        existing = conn.execute(
+            "SELECT id FROM contact_discovery_runs WHERE startup_id = ?",
+            (startup_id,),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE contact_discovery_runs SET status='pending', completed_at=NULL WHERE startup_id=?",
+                (startup_id,),
+            )
+            return existing["id"]
+        cur = conn.execute(
+            "INSERT INTO contact_discovery_runs (startup_id, status) VALUES (?, 'pending')",
+            (startup_id,),
+        )
+        return cur.lastrowid or 0
+
+
+def update_contact_discovery_status(discovery_id: int, status: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """UPDATE contact_discovery_runs SET status=?,
+               completed_at=CASE WHEN ? IN ('completed','failed') THEN datetime('now') ELSE NULL END
+               WHERE id=?""",
+            (status, status, discovery_id),
+        )
+
+
+def get_contact_discovery_run(startup_id: str) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM contact_discovery_runs WHERE startup_id = ? ORDER BY id DESC LIMIT 1",
+            (startup_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_contact_discovery_run_by_id(discovery_id: int) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM contact_discovery_runs WHERE id = ?", (discovery_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def ensure_contact_discovery_steps_registered(discovery_id: int) -> None:
+    with get_connection() as conn:
+        for sk in _CONTACT_STEP_ORDER:
+            conn.execute(
+                """INSERT OR IGNORE INTO contact_discovery_steps
+                   (discovery_id, step_key, status) VALUES (?, ?, 'idle')""",
+                (discovery_id, sk),
+            )
+
+
+def update_contact_discovery_step(
+    discovery_id: int,
+    step_key: str,
+    status: str | None = None,
+    detail: str | None = None,
+    error_message: str | None = None,
+) -> None:
+    with get_connection() as conn:
+        existing = conn.execute(
+            "SELECT id, status FROM contact_discovery_steps WHERE discovery_id=? AND step_key=?",
+            (discovery_id, step_key),
+        ).fetchone()
+        if existing:
+            sets: list[str] = []
+            params: list = []
+            if status is not None:
+                sets.append("status = ?")
+                params.append(status)
+            if detail is not None:
+                sets.append("detail = ?")
+                params.append(detail)
+            if error_message is not None:
+                sets.append("error_message = ?")
+                params.append(error_message)
+            if status == "running":
+                sets.append("started_at = datetime('now')")
+                sets.append("completed_at = NULL")
+            if status in ("completed", "error"):
+                sets.append("completed_at = datetime('now')")
+            if sets:
+                params.append(existing["id"])
+                conn.execute(
+                    f"UPDATE contact_discovery_steps SET {', '.join(sets)} WHERE id = ?",
+                    params,
+                )
+        else:
+            conn.execute(
+                """INSERT INTO contact_discovery_steps
+                   (discovery_id, step_key, status, detail, error_message, started_at, completed_at)
+                   VALUES (?, ?, ?, ?, ?,
+                           CASE WHEN ? = 'running' THEN datetime('now') ELSE NULL END,
+                           CASE WHEN ? IN ('completed','error') THEN datetime('now') ELSE NULL END)""",
+                (discovery_id, step_key, status or "idle", detail, error_message, status, status),
+            )
+
+
+def get_contact_discovery_steps(discovery_id: int) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT step_key, status, detail, error_message, started_at, completed_at "
+            "FROM contact_discovery_steps WHERE discovery_id=? ORDER BY id ASC",
+            (discovery_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 

@@ -229,7 +229,7 @@ def _llm_extract(
         name=startup_name,
         sector=sector,
         product=parsed.get("product"),
-        description="Startup profile assembled from collected public evidence via LLM.",
+        description="Perfil da startup montado a partir de evidencias publicas coletadas via LLM.",
         founders=parsed.get("founders") or [],
         funding=parsed.get("funding"),
         cited_technologies=technologies,
@@ -254,7 +254,7 @@ def _deterministic_extract(
         name=query,
         sector=sector,
         product=product,
-        description="Startup profile assembled from collected public evidence.",
+        description="Perfil da startup montado a partir de evidencias publicas coletadas.",
         founders=founders,
         funding=funding,
         cited_technologies=technologies,
@@ -363,10 +363,10 @@ def _summarize_ai_usage(
         )
     if tech_count >= 1:
         return (
-            f"Public evidence mentions AI usage{sector_info}; "
+            f"Evidencias publicas mencionam uso de IA{sector_info}; "
             f"{tech_count} tecnologia(s) especifica(s) identificada(s)."
         )
     return (
-        "Public evidence mentions AI usage; "
-        "deeper AI-native dependency still requires validation."
+        "Evidencias publicas mencionam uso de IA; "
+        "dependente mais profunda de IA-native ainda requer validacao."
     )

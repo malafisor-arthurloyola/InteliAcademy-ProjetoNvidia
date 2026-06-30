@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Cpu,
@@ -47,7 +47,8 @@ import {
 } from "@/lib/contacts-store";
 import { useRun, useRuns } from "@/lib/hooks/use-runs";
 import { useRunClaims, useRunSources } from "@/lib/hooks/use-sources";
-import { useStartup } from "@/lib/hooks/use-startups";
+import { useContacts, useStartup } from "@/lib/hooks/use-startups";
+import { ContactDiscoveryDialog } from "@/components/contact-discovery-dialog";
 
 export const Route = createFileRoute("/startup/$id")({
   head: ({ params }) => ({ meta: [{ title: `${params.id} - NVIDIA Toph` }] }),
@@ -84,6 +85,13 @@ function StartupPage() {
   const [note, setNote] = useState(contact.note ?? "");
 
   useEffect(() => setNote(contact.note ?? ""), [id, contact.note]);
+
+  const contactsQuery = useContacts(id);
+  const companyContacts = contactsQuery.data;
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const handleContactsComplete = useCallback(() => {
+    void contactsQuery.refetch();
+  }, [contactsQuery]);
 
   const error =
     startupQuery.error ??
@@ -150,7 +158,7 @@ function StartupPage() {
       <Card className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-4">
-            <CompanyLogo id={startup.id} name={startup.name} size="lg" />
+            <CompanyLogo id={startup.id} name={startup.name} size="lg" domain={sources[0]?.domain} />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="truncate text-xl font-semibold text-foreground md:text-2xl">
@@ -183,36 +191,68 @@ function StartupPage() {
         </div>
       </Card>
 
+      <ContactDiscoveryDialog
+        open={contactDialogOpen}
+        onOpenChange={setContactDialogOpen}
+        startupId={id}
+        apiBase={import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"}
+        onComplete={handleContactsComplete}
+      />
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="p-5 lg:col-span-2">
           <SectionTitle
             title="Contato da empresa"
-            desc="A API atual ainda nao fornece contato publico estruturado."
+            desc={companyContacts ? "Dados extraidos de fontes publicas." : "Clique em 'Buscar contatos' para descobrir."}
+            right={
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs"
+                onClick={() => setContactDialogOpen(true)}
+              >
+                Buscar contatos
+              </Button>
+            }
           />
           <div className="grid gap-4 sm:grid-cols-2">
             <InfoBox
               icon={<User className="h-4 w-4" />}
               label="Contato principal"
-              value="Nao disponivel"
-              detail="Aguardando fonte real de contato."
+              value={companyContacts?.primary_name ?? "Nao disponivel"}
+              detail={companyContacts?.primary_role ?? "Cargo nao encontrado"}
             />
             <InfoBox
               icon={<Mail className="h-4 w-4" />}
               label="E-mail"
-              value="Nao disponivel"
-              detail="Nao usar contato mockado."
+              value={companyContacts?.emails?.[0]?.value ?? "Nao disponivel"}
+              detail={
+                companyContacts?.emails?.length
+                  ? `${companyContacts.emails.length} email(s) encontrados`
+                  : "Nenhum email encontrado"
+              }
             />
             <InfoBox
               icon={<Phone className="h-4 w-4" />}
               label="Telefone"
-              value="Nao disponivel"
-              detail="Campo ausente no backend."
+              value={companyContacts?.phones?.[0]?.value ?? "Nao disponivel"}
+              detail={
+                companyContacts?.phones?.length
+                  ? `${companyContacts.phones.length} telefone(s) encontrados`
+                  : "Nenhum telefone encontrado"
+              }
             />
             <InfoBox
               icon={<ExternalLink className="h-4 w-4" />}
-              label="Website"
-              value={sources[0]?.domain ?? "Nao disponivel"}
-              detail={sources[0]?.url ?? "Nenhuma fonte associada ao run."}
+              label="LinkedIn"
+              value={
+                companyContacts?.linkedin_urls?.[0]?.value
+                  ? "Ver perfil"
+                  : "Nao disponivel"
+              }
+              detail={
+                companyContacts?.linkedin_urls?.[0]?.value ?? "Nenhum LinkedIn encontrado"
+              }
             />
           </div>
         </Card>

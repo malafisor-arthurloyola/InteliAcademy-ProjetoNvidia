@@ -197,6 +197,44 @@ export function fetchRunClaims(id: number): Promise<EvidenceClaimRecord[]> {
   return request<EvidenceClaimRecord[]>(`/runs/${id}/claims`);
 }
 
+export interface ContactSource {
+  source_url: string;
+  found_at: string;
+}
+
+export interface ContactEntry {
+  value: string;
+  confidence: number;
+  sources: ContactSource[];
+}
+
+export interface CompanyContact {
+  startup_id: string;
+  startup_name: string;
+  emails: ContactEntry[];
+  phones: ContactEntry[];
+  linkedin_urls: ContactEntry[];
+  addresses: ContactEntry[];
+  primary_name: string | null;
+  primary_role: string | null;
+  raw_text_snippets: string[];
+  collected_at: string | null;
+}
+
+export function discoverStartupContacts(
+  id: string,
+): Promise<CompanyContact> {
+  return request<CompanyContact>(`/startups/${id}/contacts`, {
+    method: "POST",
+  });
+}
+
+export function fetchStartupContacts(
+  id: string,
+): Promise<CompanyContact> {
+  return request<CompanyContact>(`/startups/${id}/contacts`);
+}
+
 export function submitRun(
   payload: SubmitRunPayload,
 ): Promise<SubmitRunResponse> {

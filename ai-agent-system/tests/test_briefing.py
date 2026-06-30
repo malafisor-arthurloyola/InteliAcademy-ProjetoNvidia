@@ -22,7 +22,7 @@ def test_briefing_includes_collection_error_caveats() -> None:
 
     assert briefing.caveats == [
         (
-            "Collection warning at scraper.fetch for https://example.com/missing "
+            "Aviso de coleta em scraper.fetch em https://example.com/missing "
             "via PageContentAdapter: fixture missing"
         )
     ]
@@ -44,4 +44,4 @@ def test_briefing_includes_retry_limit_caveat() -> None:
         }
     )
 
-    assert "Collection retry limit reached after 2 attempts." in briefing.caveats
+    assert "Limite de tentativas de coleta atingido apos 2 tentativas." in briefing.caveats
