@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { fetchBatch, submitDiscover } from "@/lib/api";
+import { fetchBatch, fetchBatches, submitDiscover } from "@/lib/api";
 
 export function useDiscover() {
   return useMutation({
@@ -15,5 +15,12 @@ export function useBatch(batchId: number | null) {
     enabled: !!batchId,
     refetchInterval: (data) =>
       data?.state?.data?.status === "running" ? 3000 : false,
+  });
+}
+
+export function useBatches() {
+  return useQuery({
+    queryKey: ["batches"],
+    queryFn: fetchBatches,
   });
 }

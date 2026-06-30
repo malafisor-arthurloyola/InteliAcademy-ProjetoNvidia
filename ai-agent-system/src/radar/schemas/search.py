@@ -13,6 +13,7 @@ class SearchPlan(RadarModel):
     keywords: list[str]
     source_types: list[str]
     collection_plan: list[str]
+    mode: str = "research"
 
 
 class SourceCandidate(IdentifiedModel):

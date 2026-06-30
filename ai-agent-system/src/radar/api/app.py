@@ -403,6 +403,13 @@ def discover_startups(payload: DiscoverRequest) -> dict[str, Any]:
     })
 
 
+@app.get("/batches")
+def list_batches() -> list[dict[str, Any]]:
+    from radar.database.repository import get_all_batches
+
+    return jsonable_encoder(get_all_batches())
+
+
 @app.get("/batches/{batch_id}")
 def get_batch_status(batch_id: int) -> dict[str, Any]:
     from radar.database.repository import get_batch

@@ -88,7 +88,8 @@ class SearchBackedCollector(WebCollector):
             ]
 
         candidates = _filter_relevant_candidates(candidates, plan)
-        candidates = candidates[:MAX_CANDIDATES]
+        max_candidates = DISCOVERY_MAX_CANDIDATES if plan.mode == "discovery" else MAX_CANDIDATES
+        candidates = candidates[:max_candidates]
 
         sources: list[SourceDocument] = []
         errors: list[PipelineError] = []

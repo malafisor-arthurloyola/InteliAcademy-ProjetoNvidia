@@ -274,9 +274,16 @@ export function submitRun(
   });
 }
 
+export interface CandidateItem {
+  startup_name: string;
+  query: string;
+  source: string;
+  score?: string;
+}
+
 export interface DiscoverResponse {
   query: string;
-  candidates: { startup_name: string; query: string; source: string }[];
+  candidates: CandidateItem[];
   batch_id: number | null;
   status: string;
   total: number;
@@ -319,4 +326,18 @@ export function fetchBatch(
   batchId: number,
 ): Promise<BatchResponse> {
   return request<BatchResponse>(`/batches/${batchId}`);
+}
+
+export interface BatchSummary {
+  id: number;
+  status: string;
+  total: number;
+  completed: number;
+  failed: number;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export function fetchBatches(): Promise<BatchSummary[]> {
+  return request<BatchSummary[]>("/batches");
 }
