@@ -53,6 +53,7 @@ def test_firecrawl_search_queries_use_short_query_expansions() -> None:
         "traction",
         "traction startup",
         "traction Brasil startup",
+        "traction AI",
     ]
 
 
