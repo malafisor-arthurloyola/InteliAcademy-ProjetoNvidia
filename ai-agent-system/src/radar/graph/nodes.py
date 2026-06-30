@@ -15,7 +15,7 @@ from radar.graph.state import RadarState
 
 
 def search_planner_node(state: RadarState) -> dict[str, Any]:
-    plan = plan_search(state["query"], state.get("startup_name"))
+    plan = plan_search(state["query"], state.get("startup_name"), mode=state.get("mode", "research"))
     tracker = get_tracker()
     if tracker:
         kw = plan.keywords[:4]

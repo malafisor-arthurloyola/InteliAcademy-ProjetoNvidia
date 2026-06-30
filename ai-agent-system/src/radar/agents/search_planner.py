@@ -65,9 +65,58 @@ def _generate_name_queries(
     return list(dict.fromkeys(queries))
 
 
-def plan_search(query: str, startup_name: str | None = None) -> SearchPlan:
+def _generate_discovery_queries(query: str) -> list[str]:
+    base = query.strip()
+    if not base:
+        base = "startup IA Brasil"
+
+    queries = [
+        base,
+        f"{base} 2026",
+        f"{base} fundada funding",
+        f"{base} inteligência artificial produto",
+        f"startup brasileira IA {base}",
+        f"site:crunchbase.com {base}",
+        f"site:distrito.me {base}",
+        f"site:startse.com {base} startup",
+        f"{base} founders CEO",
+    ]
+
+    sector_hints = {
+        "saude": "site:distrito.me saude IA startup",
+        "fintech": "site:crunchbase.com fintech IA Brasil",
+        "educacao": "edtech IA Brasil startup",
+        "agro": "agrotech IA Brasil startup",
+        "logistica": "logtech IA Brasil startup",
+        "saúde": "site:distrito.me saude IA startup",
+        "health": "site:distrito.me saude IA startup",
+        "recrutamento": "HR tech IA Brasil startup",
+        "hr": "HR tech IA Brasil startup",
+    }
+    for key, site_query in sector_hints.items():
+        if key in base.lower():
+            queries.append(site_query)
+            break
+
+    return list(dict.fromkeys(queries))
+
+
+def plan_search(query: str, startup_name: str | None = None, mode: str = "research") -> SearchPlan:
     raw_keywords = [term.strip() for term in query.replace(",", " ").split() if term.strip()]
     is_short = len(raw_keywords) <= 1 and len(query.split()) <= 2
+
+    if mode == "discovery":
+        keywords = _generate_discovery_queries(query)
+        return SearchPlan(
+            query=query,
+            keywords=keywords,
+            source_types=DEFAULT_SOURCE_TYPES,
+            collection_plan=[
+                f"Modo descoberta: '{query}' — buscando startups em diretórios, Crunchbase, Distrito, notícias.",
+                "Extrair nomes, domínios e tecnologias de cada candidato encontrado.",
+                "Preservar URLs e metadados de cada fonte para desambiguação posterior.",
+            ],
+        )
 
     name_queries = _generate_name_queries(startup_name, query) if startup_name else []
 

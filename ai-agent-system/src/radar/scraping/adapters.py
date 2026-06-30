@@ -171,7 +171,7 @@ class ConfiguredSerpApiSearchAdapter:
         seen_urls: set[str] = set()
         search_queries = _search_queries_for_plan(plan)
         search_queries = _prioritize_ia_queries(search_queries)
-        per_query_limit = max(5, 15 // len(search_queries))
+        per_query_limit = max(8, 20 // len(search_queries))
 
         for search_query in search_queries:
             try:
@@ -427,7 +427,7 @@ def _prioritize_ia_queries(queries: list[str]) -> list[str]:
     return ia_queries + other_queries
 
 
-def _search_queries_for_plan(plan: SearchPlan, max_queries: int = 3) -> list[str]:
+def _search_queries_for_plan(plan: SearchPlan, max_queries: int = 5) -> list[str]:
     queries = [plan.query.strip()]
     for keyword in plan.keywords:
         normalized = keyword.strip()

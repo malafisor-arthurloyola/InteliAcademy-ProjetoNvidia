@@ -1899,3 +1899,51 @@ O **rate limit foi resolvido**, mas a **qualidade da busca** ainda é o gargalo:
 3. Merge briefing-v2 → main
 4. Criar branch radar-mode para varredura automática
 ```
+ 
+---
+
+## 2026-06-30 — Thread-local PlaywrightPool, Batch endpoint funcional, Classifier fix, Início Discovery Mode
+
+### Resumo executivo
+
+Corrigido PlaywrightPool (threading.local() resolve "cannot switch thread"). Batch endpoint testado com 3 startups em paralelo (~56s, 100% completado). Classifier determinístico tinha cap fixo 0.85 para AI-Enabled — substituído por fórmula proporcional (combined/9 + 0.25), agora diferencia startups. Iniciada branch `feat/search-agent-discovery` para implementar modo descoberta: SearchPlanner capaz de buscar startups no geral (não apenas uma específica).
+
+### Commit
+
+```text
+21e4138 fix: remove hardcoded 0.85 confidence cap for AI-Enabled, use proportional formula combined/9 + 0.25
+f65bbd1 feat: batch endpoint, PlaywrightPool thread-local, Playwright warmup, database CRUD for batches
+```
+
+### O que foi feito
+
+#### PlaywrightPool thread-local
+- Pool antigo usava `LifoQueue` compartilhada — crashava com `cannot switch to a different thread` em execução paralela
+- Novo `PlaywrightPool` usa `threading.local()` — cada thread ganha browser próprio na primeira chamada
+- `acquire()` retorna browser da thread; `release()` vira no-op
+- Warmup no startup do servidor (`_prewarm_playwright_pool` em `app.py`) — apenas instancia o pool
+
+#### Batch endpoint (POST/GET /batches)
+- Worker com `ThreadPoolExecutor(concurrency)` executa N pipelines em paralelo
+- `create_batch()`, `update_batch_item()`, `complete_batch()` em `repository.py`
+- Testado com 3 startups: Fintalk (7 claims), Gupy (5 claims), ResolvaAI (18 claims) — 100% completado em ~56s
+
+#### Classifier: cap 0.85 → fórmula proporcional
+- `classifier.py:156`: `combined / 4.0` → `combined / 9.0 + 0.25`, cap 0.90
+- Antes: todas AI-Enabled = exatamente 0.85 (mesmo com 18 claims vs 7 claims)
+- Depois: Fintalk 0.83, Gupy 0.72, ResolvaAI 0.90 — proporcional às evidências
+
+#### Discovery Mode (iniciado — branch `feat/search-agent-discovery`)
+- Identificado problema crítico: SearchPlanner só sabe buscar startup específica
+- Planejada reestruturação: `discovery_plan_search()` gera queries de descoberta (por setor, funding, tecnologia) + site-specific (Crunchbase, Distrito)
+- `MAX_CANDIDATES` de 8 → 20 no discovery mode
+- SearchPlanner terá 2 modos: `research` (busca individual, existente) e `discovery` (novo)
+
+### Próximos passos
+
+```text
+1. [EM ANDAMENTO] Implementar Discovery Mode no SearchPlanner
+2. Adicionar página /batches no frontend (batch-frontend)
+3. Substituir classificador determinístico por LLM real (llm-classifier)
+4. PostgreSQL (postergado — SQLite suficiente para escala atual)
+```

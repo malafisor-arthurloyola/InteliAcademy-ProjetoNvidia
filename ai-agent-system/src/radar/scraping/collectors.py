@@ -7,7 +7,8 @@ from typing import Protocol
 from radar.schemas import PipelineError, SearchPlan, SourceCandidate, SourceDocument
 from radar.scraping.normalizers import normalize_source_payloads
 
-MAX_CANDIDATES = 8
+MAX_CANDIDATES = 20
+DISCOVERY_MAX_CANDIDATES = 40
 
 DOMAIN_BLOCKLIST: set[str] = {
     "youtube.com", "youtu.be",

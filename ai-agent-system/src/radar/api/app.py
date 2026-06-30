@@ -125,6 +125,7 @@ app.add_middleware(
 class RunRequest(BaseModel):
     query: str
     startup_name: str | None = None
+    mode: str = "research"
 
 
 class BatchStartupItem(BaseModel):
@@ -243,19 +244,19 @@ def run_analysis(payload: RunRequest) -> dict[str, Any]:
 
     threading.Thread(
         target=_run_pipeline_background,
-        args=(run_id, query, tracker, payload.startup_name),
+        args=(run_id, query, tracker, payload.startup_name, payload.mode),
         daemon=True,
     ).start()
 
     return jsonable_encoder({"run_id": run_id, "status": "pending"})
 
 
-def _run_pipeline_background(run_id: int, query: str, tracker: PipelineTracker, startup_name: str | None = None) -> None:
+def _run_pipeline_background(run_id: int, query: str, tracker: PipelineTracker, startup_name: str | None = None, mode: str = "research") -> None:
     update_run_status(run_id, "running")
     set_tracker(tracker)
     try:
         graph = build_graph()
-        initial_state: dict[str, Any] = {"query": query, "collection_attempts": 0}
+        initial_state: dict[str, Any] = {"query": query, "collection_attempts": 0, "mode": mode}
         if startup_name:
             initial_state["startup_name"] = startup_name
         result: dict[str, Any] = graph.invoke(initial_state)
@@ -382,7 +383,7 @@ def _run_batch_background(batch_id: int, items: list[dict[str, str]], concurrenc
             update_run_status(run_id, "running")
 
             graph = build_graph()
-            initial_state: dict[str, Any] = {"query": query, "collection_attempts": 0}
+            initial_state: dict[str, Any] = {"query": query, "collection_attempts": 0, "mode": "research"}
             if startup_name:
                 initial_state["startup_name"] = startup_name
             result = graph.invoke(initial_state)
