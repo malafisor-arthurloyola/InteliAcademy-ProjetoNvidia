@@ -66,10 +66,6 @@ export function findLatestRunForStartup(
     return query.includes(normalizedName) || normalizedName.includes(query);
   });
 
-  if (candidates.length === 0 && runs.length === 1) {
-    return runs[0];
-  }
-
   return (
     [...candidates].sort((a, b) => runTimestamp(b) - runTimestamp(a))[0] ?? null
   );
