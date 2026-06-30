@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -117,6 +118,8 @@ def discover_contacts(
 
     if tracker:
         tracker.complete("preparing_queries", f"{len(plan.keywords)} queries preparadas")
+    _fixture_delay()
+    if tracker:
         tracker.start("searching_web", "Buscando paginas com informacoes de contato...")
 
     collector = build_web_collector()
@@ -127,6 +130,8 @@ def discover_contacts(
 
     if tracker:
         tracker.complete("searching_web", f"{len(sources)} pagina(s) encontrada(s)")
+    _fixture_delay()
+    if tracker:
         tracker.start("extracting_contacts", "Extraindo emails, telefones, LinkedIn...")
 
     all_emails, all_phones, all_linkedin, all_addresses, raw_snippets = _extract_from_sources(sources)
@@ -141,6 +146,8 @@ def discover_contacts(
             "extracting_contacts",
             f"{email_count} email(s), {phone_count} telefone(s), {linkedin_count} LinkedIn, {addr_count} endereco(s)",
         )
+    _fixture_delay()
+    if tracker:
         tracker.start("fallback_sources", "Verificando fontes existentes no banco...")
 
     if not all_emails and not all_phones and not all_linkedin:
@@ -157,12 +164,16 @@ def discover_contacts(
             "fallback_sources",
             f"Total: {len(all_emails)} email(s), {len(all_phones)} telefone(s)",
         )
+    _fixture_delay()
+    if tracker:
         tracker.start("cross_referencing", "Cruzando informacoes entre fontes...")
 
     entry_count = max(len(all_emails), len(all_phones), len(all_linkedin), len(all_addresses), 1)
 
     if tracker:
         tracker.complete("cross_referencing", f"{entry_count} entradas consolidadas")
+    _fixture_delay()
+    if tracker:
         tracker.start("saving_result", "Salvando dados de contato...")
 
     result = CompanyContact(
@@ -208,6 +219,12 @@ def discover_contacts(
         tracker.complete("saving_result", "Contatos salvos com sucesso")
 
     return result
+
+
+def _fixture_delay() -> None:
+    from radar.settings import get_settings
+    if get_settings().search_provider == "fixture":
+        time.sleep(0.5)
 
 
 def _cross_ref_confidence(source_count: int) -> float:

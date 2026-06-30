@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { Search, Sparkles, BarChart3, FileSearch, FileText, TrendingUp, ShieldCheck, Cpu, Database, ArrowRight, Handshake, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,9 @@ import { useContacts } from "@/lib/contacts-store";
 import { useHealth } from "@/lib/hooks/use-health";
 import { useStartups } from "@/lib/hooks/use-startups";
 import { useRuns } from "@/lib/hooks/use-runs";
+import { useQueryClient } from "@tanstack/react-query";
 import { ApiErrorDisplay } from "@/components/api-error-display";
+import { PipelineDialog } from "@/components/pipeline-dialog";
 import type { StartupRecord } from "@/lib/api";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
@@ -50,7 +52,9 @@ function Metric({ label, value, hint, icon: Icon }: { label: string; value: stri
 
 function Overview() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [q, setQ] = useState("");
+  const [dialogQuery, setDialogQuery] = useState<string | null>(null);
   const contacts = useContacts();
   const { data: health, error: healthError, refetch: retryHealth } = useHealth();
   const { data: startupRecords = [], isLoading: startupsLoading, error: startupsError } = useStartups();
@@ -100,11 +104,14 @@ function Overview() {
 
   const onAnalyze = () => {
     const query = q.trim();
-    navigate({
-      to: "/pipeline",
-      search: query ? { query, autoRun: true } : {},
-    });
+    if (query) setDialogQuery(query);
   };
+
+  const handlePipelineComplete = useCallback(() => {
+    setDialogQuery(null);
+    qc.invalidateQueries({ queryKey: ["startups"] });
+    qc.invalidateQueries({ queryKey: ["runs"] });
+  }, [qc]);
 
   const error = healthError ?? startupsError;
   if (error && !apiOk) {
@@ -276,6 +283,16 @@ function Overview() {
           </div>
         </Card>
       </div>
+
+      {/* Pipeline dialog */}
+      {dialogQuery && (
+        <PipelineDialog
+          query={dialogQuery}
+          open={dialogQuery !== null}
+          onOpenChange={() => setDialogQuery(null)}
+          onComplete={handlePipelineComplete}
+        />
+      )}
 
       {/* Top opportunities */}
       <Card className="p-4">
