@@ -241,6 +241,35 @@ def test_get_run_by_id_none() -> None:
     assert get_run_by_id(999) is None
 
 
+def test_get_all_batches_empty() -> None:
+    from radar.database.repository import get_all_batches
+
+    assert get_all_batches() == []
+
+
+def test_get_all_batches_returns_stored_batches() -> None:
+    from radar.database.repository import create_batch, get_all_batches
+
+    items = [{"startup_name": "Enter", "query": "Enter AI"}]
+    batch_id = create_batch(items)
+    all_batches = get_all_batches()
+    assert len(all_batches) >= 1
+    matching = [b for b in all_batches if b["id"] == batch_id]
+    assert matching
+    assert matching[0]["total"] == 1
+
+
+def test_get_all_batches_ordered_by_created_at_desc() -> None:
+    from radar.database.repository import create_batch, get_all_batches
+
+    id1 = create_batch([{"startup_name": "A", "query": "A"}])
+    id2 = create_batch([{"startup_name": "B", "query": "B"}])
+    all_batches = get_all_batches()
+    idx1 = next(i for i, b in enumerate(all_batches) if b["id"] == id1)
+    idx2 = next(i for i, b in enumerate(all_batches) if b["id"] == id2)
+    assert idx2 < idx1  # mais recente primeiro
+
+
 def test_get_startup_by_id_none() -> None:
     assert get_startup_by_id("nonexistent") is None
 

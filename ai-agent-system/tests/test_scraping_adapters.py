@@ -57,6 +57,39 @@ def test_firecrawl_search_queries_use_short_query_expansions() -> None:
     ]
 
 
+def test_firecrawl_search_queries_discovery_mode_uses_max_20() -> None:
+    plan = SearchPlan(
+        query="startup IA Brasil",
+        keywords=[
+            "startup IA Brasil 2026", "AI startups Brazil", "inteligência artificial Brasil",
+            "top 10 startups IA Brasil", "startups IA Brasil jurídico",
+            "startups IA Brasil fintech", "agentes IA Brasil", "unicórnio IA Brasil",
+            "site:crunchbase.com startup IA Brasil",
+            "startup IA Brasil 2025", "startup brasileira IA", "empresas IA Brasil",
+        ],
+        source_types=["official_site"],
+        collection_plan=[],
+        mode="discovery",
+    )
+    queries = _search_queries_for_plan(plan)
+    assert len(queries) <= 20
+
+
+def test_search_queries_for_plan_research_mode_defaults_to_5() -> None:
+    plan = SearchPlan(
+        query="startup IA Brasil",
+        keywords=[
+            "startup IA Brasil 2026", "AI startups Brazil", "inteligência artificial Brasil",
+            "top 10 startups IA Brasil", "startups IA Brasil jurídico",
+        ],
+        source_types=["official_site"],
+        collection_plan=[],
+        mode="research",
+    )
+    queries = _search_queries_for_plan(plan)
+    assert len(queries) <= 5
+
+
 def test_firecrawl_source_type_infers_official_company_domain() -> None:
     assert (
         _infer_source_type_from_url(

@@ -546,7 +546,7 @@ def update_batch_item(item_id: int, run_id: int | None = None, status: str | Non
 def get_all_batches() -> list[dict[str, Any]]:
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT id, status, total, completed, failed, created_at, completed_at FROM batches ORDER BY created_at DESC"
+            "SELECT id, status, total, completed, failed, created_at, completed_at FROM batches ORDER BY created_at DESC, id DESC"
         ).fetchall()
         return [dict(r) for r in rows]
 
