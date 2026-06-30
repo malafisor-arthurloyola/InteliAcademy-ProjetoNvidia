@@ -153,7 +153,7 @@ def _deterministic_classify(claims, sources, profiles) -> StartupClassification:
     if combined >= 1.5 or (ai_claims and has_nvidia_techs) or (ai_claims and len(ai_claims) >= 2 and combined >= 1.0):
         return StartupClassification(
             label="AI-Enabled",
-            confidence=min(max(combined / 4.0, 0.5), 0.85),
+            confidence=min(max(combined / 9.0 + 0.25, 0.5), 0.90),
             rationale=(
                 f"Evidencias publicas sugerem uso de IA. "
                 f"Sinais AI-Enabled: {_list_signals(all_text, AI_ENABLED_KEYWORDS)}. "
