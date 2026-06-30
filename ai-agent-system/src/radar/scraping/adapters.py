@@ -103,8 +103,8 @@ class HtmlPageContentAdapter:
 class PlaywrightPageAdapter:
     """Fetch page content via Playwright (Chromium headless) with trafilatura extraction.
 
-    Fallback for sites blocked by Firecrawl free tier. Requires Chromium installed
-    via ``playwright install chromium``.
+    Uses a shared ``PlaywrightPool`` to reuse browser instances across fetches
+    and across pipelines, avoiding ~3s launch overhead per page.
     """
 
     provider = "playwright"
@@ -117,18 +117,21 @@ class PlaywrightPageAdapter:
 
         import trafilatura
 
-        from playwright.sync_api import sync_playwright
+        from radar.scraping.playwright_pool import get_pool
 
+        pool = get_pool()
         url = str(candidate.url)
 
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+        browser = pool.acquire()
+        try:
             page = browser.new_page()
             try:
                 page.goto(url, wait_until="domcontentloaded", timeout=self._settings.provider_timeout_seconds * 1000)
                 html = page.content()
             finally:
-                browser.close()
+                page.close()
+        finally:
+            pool.release(browser)
 
         text = trafilatura.extract(html, include_comments=False, include_tables=True, output_format="txt") or ""
         if not text:

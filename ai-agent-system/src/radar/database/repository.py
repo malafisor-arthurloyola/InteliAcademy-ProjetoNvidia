@@ -130,6 +130,29 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_cd_steps_discovery ON contact_discovery_steps(discovery_id);
 
+            CREATE TABLE IF NOT EXISTS batches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                status TEXT NOT NULL DEFAULT 'running',
+                total INTEGER NOT NULL,
+                completed INTEGER NOT NULL DEFAULT 0,
+                failed INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                completed_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS batch_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                batch_id INTEGER NOT NULL REFERENCES batches(id),
+                startup_name TEXT NOT NULL,
+                query TEXT NOT NULL,
+                run_id INTEGER REFERENCES runs(id),
+                status TEXT NOT NULL DEFAULT 'pending',
+                error_message TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                completed_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_batch_items_batch ON batch_items(batch_id);
+
             CREATE INDEX IF NOT EXISTS idx_run_steps_run_id ON run_steps(run_id);
             CREATE UNIQUE INDEX IF NOT EXISTS idx_run_steps_run_step ON run_steps(run_id, step_key);
         """)
@@ -469,6 +492,70 @@ def get_run_by_id(run_id: int) -> dict[str, Any] | None:
     with get_connection() as conn:
         row = conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
         return dict(row) if row else None
+
+
+def create_batch(items: list[dict[str, str]]) -> int:
+    with get_connection() as conn:
+        cur = conn.execute(
+            "INSERT INTO batches (status, total) VALUES ('running', ?)",
+            (len(items),),
+        )
+        batch_id = cur.lastrowid or 0
+        for item in items:
+            conn.execute(
+                "INSERT INTO batch_items (batch_id, startup_name, query) VALUES (?, ?, ?)",
+                (batch_id, item["startup_name"], item["query"]),
+            )
+        return batch_id
+
+
+def get_batch(batch_id: int) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM batches WHERE id = ?", (batch_id,)).fetchone()
+        if not row:
+            return None
+        result = dict(row)
+        items = conn.execute(
+            "SELECT * FROM batch_items WHERE batch_id = ? ORDER BY id ASC",
+            (batch_id,),
+        ).fetchall()
+        result["items"] = [dict(r) for r in items]
+        return result
+
+
+def update_batch_item(item_id: int, run_id: int | None = None, status: str | None = None, error_message: str | None = None) -> None:
+    with get_connection() as conn:
+        sets: list[str] = []
+        params: list = []
+        if run_id is not None:
+            sets.append("run_id = ?")
+            params.append(run_id)
+        if status is not None:
+            sets.append("status = ?")
+            params.append(status)
+            sets.append("completed_at = CASE WHEN ? IN ('completed','failed') THEN datetime('now') ELSE NULL END")
+            params.append(status)
+        if error_message is not None:
+            sets.append("error_message = ?")
+            params.append(error_message)
+        if sets:
+            params.append(item_id)
+            conn.execute(f"UPDATE batch_items SET {', '.join(sets)} WHERE id = ?", params)
+
+
+def complete_batch(batch_id: int) -> None:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) as total, SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as completed, SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) as failed FROM batch_items WHERE batch_id = ?",
+            (batch_id,),
+        ).fetchone()
+        total = row["total"]
+        done = row["completed"] + row["failed"]
+        status = "completed" if done >= total else "running"
+        conn.execute(
+            "UPDATE batches SET status = ?, completed = ?, failed = ?, completed_at = CASE WHEN ? IN ('completed','failed') THEN datetime('now') ELSE NULL END WHERE id = ?",
+            (status, row["completed"], row["failed"], status, batch_id),
+        )
 
 
 def get_run_recommendations(run_id: int) -> list[dict[str, Any]]:

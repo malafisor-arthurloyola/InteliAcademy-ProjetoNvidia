@@ -1776,7 +1776,87 @@ npm run lint -> falha global por Prettier em muitos arquivos nao relacionados; a
 
 ---
 
-## 2026-06-30 — Migração DuckDuckGo (ddgs) e estabilização do search provider
+## 2026-06-30 (continuação) — SerpAPI real, RAG fallback determinístico, scraper paralelo
+
+### Resumo executivo
+
+Pipeline finalizada com dados reais (SerpAPI primário + DuckDuckGo como fallback). Corrigido bug do `None` no filtro de candidatos. Adicionado fallback determinístico no RAG para garantir recomendações NVIDIA sempre que houver evidências de IA. Scraper paralelizado com `ThreadPoolExecutor(4)` + limite de 8 candidatos, reduzindo fetch de ~90s para ~32s. Iniciada Fase 2 (PlaywrightPool) e Fase 3 (batch endpoint).
+
+### O que foi feito nesta sessão
+
+#### SerpAPI real
+- `ConfiguredSerpApiSearchAdapter` chama `https://serpapi.com/search` via `urllib.request` real
+- Retorna 20+ candidatos por run (vs 4 do DuckDuckGo)
+- Run #15 (Fintalk): 16 fontes, classificação AI-Native 0.95 (com SerpAPI + Playwright)
+
+#### Bug do None no filtro de candidatos
+- `_filter_relevant_candidates()` retornava `None` porque `return` dentro de `_name_keywords()` matava a execução
+- Corrigido e validado (Run #15 rodou sem erro)
+
+#### RAG fallback determinístico
+- `nvidia_rag.py`: quando busca vetorial retorna 0 chunks (score < 0.3), fallback `_deterministic_retrieve()` mapeia keywords da evidência → chunks da knowledge base
+- Mapeamento: call center/voz → Riva, LLM/agentes → NIM+NeMo+Guardrails, dados → RAPIDS+cuDF+cuML, etc.
+- Run #16 (Fintalk com startup_name): 6 chunks, 4 recomendações NVIDIA
+
+#### Extractor respeita startup_name
+- `state.get("startup_name")` propagado para `_build_profile()` → `_llm_extract()` → LLM recebe nome correto no prompt
+- `_deterministic_extract()` usa `known_name or query`
+- Run #15 sem `startup_name` extraiu "StaryaAI" do mix; Run #16 com `startup_name="Fintalk"` extraiu "Fintalk"
+
+#### Scraper paralelo
+- `collectors.py`: `ThreadPoolExecutor(max_workers=4)` + `MAX_CANDIDATES=8`
+- Playwright thread-safe (cria browser novo por fetch)
+- 8 fontes em ~32s (vs 16 em 92s sequencial)
+
+#### PlaywrightPool (Fase 2 — iniciada)
+- `scraping/playwright_pool.py`: pool thread-safe com 4 browsers reutilizáveis
+- `acquire()`/`release()` via `queue.LifoQueue`
+- `PlaywrightPageAdapter.fetch()` usa pool em vez de `sync_playwright()`
+- Pendente: integração completa na factory
+
+#### Batch endpoint (Fase 3 — iniciada)
+- `POST /batches` aceita `{startups: [{startup_name, query}]}`
+- `GET /batches/{id}` retorna status agregado + itens
+- Tabelas: `batches`, `batch_items` no SQLite
+- Pendente: integração frontend
+
+#### Testes com Gupy (Run #17)
+- Tempo total: 56s (vs 116s antes da paralelização)
+- Nome: Gupy ✅, Classificação: AI-Enabled (0.85)
+- 4 recomendações: NIM, NeMo, Guardrails, Clara
+- Scraper: 32s para 8 fontes em paralelo
+
+### Arquivos alterados/criados nesta sessão
+
+```text
+ai-agent-system/src/radar/agents/extractor.py       # startup_name propagation
+ai-agent-system/src/radar/agents/nvidia_rag.py       # deterministic fallback
+ai-agent-system/src/radar/scraping/collectors.py     # ThreadPoolExecutor + MAX_CANDIDATES
+ai-agent-system/src/radar/scraping/adapters.py       # SerpAPI real, Playwright pool
+ai-agent-system/src/radar/scraping/playwright_pool.py  # NOVO — browser pool
+ai-agent-system/src/radar/scraping/provider_factory.py # pool injection
+ai-agent-system/src/radar/scraping/search_planner.py  # name queries
+ai-agent-system/src/radar/api/app.py                 # batch endpoints
+ai-agent-system/src/radar/database/repository.py     # batch tables
+.env.example                                         # serpapi, duckduckgo options
+README.md                                            # rewrite completo
+Documents/Relatorio de Progresso.md                  # esta entrada
+```
+
+### Commits
+
+```text
+84dcf73 feat: extractor respects startup_name, RAG deterministic fallback, parallel scraping
+```
+
+### Próximos passos
+
+```text
+1. Finalizar PlaywrightPool: aquecimento na inicialização do servidor
+2. Finalizar batch endpoint: worker com semáforo de concorrência
+3. Adicionar página /batches no frontend
+4. Testar com 10+ startups em modo radar
+5. Migrar SQLite → PostgreSQL para produção
 
 ### Problema
 

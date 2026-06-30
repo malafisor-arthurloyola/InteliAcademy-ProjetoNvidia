@@ -76,7 +76,19 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     init_db()
 
     _prewarm_vector_store()
+    _prewarm_playwright_pool()
     yield
+
+
+def _prewarm_playwright_pool() -> None:
+    try:
+        from radar.scraping.playwright_pool import get_pool
+
+        pool = get_pool()
+        import logging
+        logging.getLogger("radar").info("PlaywrightPool instantiated (size=%d). Warmup deferred to first use.", pool.size())
+    except Exception:
+        pass
 
 
 def _prewarm_vector_store() -> None:
@@ -113,6 +125,16 @@ app.add_middleware(
 class RunRequest(BaseModel):
     query: str
     startup_name: str | None = None
+
+
+class BatchStartupItem(BaseModel):
+    startup_name: str
+    query: str
+
+
+class BatchRequest(BaseModel):
+    startups: list[BatchStartupItem]
+    concurrency: int = 4
 
 
 def _persist_run_result(run_id: int, result: dict[str, Any]) -> None:  # noqa: C901
@@ -315,6 +337,81 @@ def stream_pipeline(run_id: int):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@app.post("/batches")
+def run_batch(payload: BatchRequest) -> dict[str, Any]:
+    items = [m.model_dump() for m in payload.startups]
+    if not items:
+        raise HTTPException(status_code=400, detail="startups list must not be empty")
+
+    from radar.database.repository import create_batch
+
+    batch_id = create_batch(items)
+
+    threading.Thread(
+        target=_run_batch_background,
+        args=(batch_id, items, payload.concurrency),
+        daemon=True,
+    ).start()
+
+    return jsonable_encoder({"batch_id": batch_id, "status": "running", "total": len(items)})
+
+
+@app.get("/batches/{batch_id}")
+def get_batch_status(batch_id: int) -> dict[str, Any]:
+    from radar.database.repository import get_batch
+
+    batch = get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    return jsonable_encoder(batch)
+
+
+def _run_batch_background(batch_id: int, items: list[dict[str, str]], concurrency: int) -> None:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from radar.database.repository import complete_batch, get_batch, update_batch_item
+    from radar.graph.builder import build_graph
+
+    def _run_single(item: dict[str, str]) -> tuple[str, str | None]:
+        try:
+            startup_name = item["startup_name"]
+            query = item["query"]
+
+            run_id = save_run(query)
+            update_run_status(run_id, "running")
+
+            graph = build_graph()
+            initial_state: dict[str, Any] = {"query": query, "collection_attempts": 0}
+            if startup_name:
+                initial_state["startup_name"] = startup_name
+            result = graph.invoke(initial_state)
+            _persist_run_result(run_id, result)
+            return "completed", str(run_id)
+        except Exception as exc:
+            import logging
+            logging.getLogger("radar").error("Batch item %s failed: %s", item["startup_name"], exc)
+            return "failed", str(exc)
+
+    with ThreadPoolExecutor(max_workers=concurrency) as executor:
+        future_map = {executor.submit(_run_single, item): item for item in items}
+        for future in as_completed(future_map):
+            item = future_map[future]
+            try:
+                status, detail = future.result()
+            except Exception as exc:
+                status, detail = "failed", str(exc)
+
+            batch = get_batch(batch_id)
+            if batch and batch.get("items"):
+                for bi in batch["items"]:
+                    if bi["startup_name"] == item["startup_name"] and bi["query"] == item["query"]:
+                        run_id = int(detail) if status == "completed" and detail else None
+                        error_msg = detail if status == "failed" else None
+                        update_batch_item(bi["id"], run_id=run_id, status=status, error_message=error_msg)
+                        break
+
+    complete_batch(batch_id)
 
 
 @app.get("/startups")

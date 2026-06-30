@@ -56,6 +56,9 @@ def _build_page_adapter(settings: RadarSettings):
     if settings.page_provider == "firecrawl":
         return FirecrawlPageAdapter(settings=settings)
     if settings.page_provider == "playwright":
+        from radar.scraping.playwright_pool import warmup_pool
+
+        warmup_pool()
         return PlaywrightPageAdapter(settings=settings)
     raise ProviderSelectionError(
         f"Unsupported page provider: {settings.page_provider}. "
