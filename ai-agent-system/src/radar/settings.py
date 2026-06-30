@@ -28,9 +28,9 @@ class RadarSettings(BaseSettings):
         populate_by_name=True,
     )
 
-    enable_external_providers: bool = False
-    search_provider: SearchProviderName = "fixture"
-    page_provider: PageProviderName = "fixture"
+    enable_external_providers: bool = True
+    search_provider: SearchProviderName = "firecrawl"
+    page_provider: PageProviderName = "firecrawl"
     provider_timeout_seconds: int = Field(default=10, ge=1, le=120)
 
     llm_provider: LLMProviderName = "groq"
