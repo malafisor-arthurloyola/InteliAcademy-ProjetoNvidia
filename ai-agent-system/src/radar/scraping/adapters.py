@@ -125,7 +125,7 @@ class PlaywrightPageAdapter:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             try:
-                page.goto(url, wait_until="networkidle", timeout=self._settings.provider_timeout_seconds * 1000)
+                page.goto(url, wait_until="domcontentloaded", timeout=self._settings.provider_timeout_seconds * 1000)
                 html = page.content()
             finally:
                 browser.close()
@@ -216,6 +216,55 @@ class FirecrawlSearchAdapter:
 
         return normalize_search_result_payloads(
             [{  # normalize_search_result_payload expects specific keys
+                "link": c["url"],
+                "title": c["title"],
+                "snippet": c["description"],
+                "kind": c["source_type"],
+                "rank": c["rank"],
+            } for c in candidates],
+            provider=self.provider,
+        )
+
+
+class DuckDuckGoSearchAdapter:
+    """Search the web via DuckDuckGo (free, no API key required)."""
+
+    provider = "duckduckgo"
+
+    def search(self, plan: SearchPlan) -> list[SourceCandidate]:
+        _ensure_external_provider_enabled(get_settings(), self.provider)
+
+        from duckduckgo_search import DDGS
+
+        candidates = []
+        seen_urls: set[str] = set()
+        search_queries = _search_queries_for_plan(plan)
+        search_queries = _prioritize_ia_queries(search_queries)
+        per_query_limit = max(5, 15 // len(search_queries))
+
+        for search_query in search_queries:
+            try:
+                results = DDGS().text(keywords=search_query, max_results=per_query_limit)
+                import time
+                time.sleep(1)
+            except Exception:
+                continue
+
+            for item in results:
+                url = item.get("href") or item.get("link") or ""
+                if not url or url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                candidates.append({
+                    "url": url,
+                    "title": item.get("title", ""),
+                    "description": item.get("body", item.get("snippet", "")),
+                    "source_type": _infer_source_type_from_url(url, plan.query),
+                    "rank": len(candidates) + 1,
+                })
+
+        return normalize_search_result_payloads(
+            [{
                 "link": c["url"],
                 "title": c["title"],
                 "snippet": c["description"],

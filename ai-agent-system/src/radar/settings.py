@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 ProviderMode = Literal["fixture", "external"]
-SearchProviderName = Literal["fixture", "serpapi", "firecrawl"]
+SearchProviderName = Literal["fixture", "serpapi", "firecrawl", "duckduckgo"]
 PageProviderName = Literal["fixture", "firecrawl", "playwright"]
 LLMProviderName = Literal["groq", "openai", "gemini"]
 
@@ -31,7 +31,7 @@ class RadarSettings(BaseSettings):
     enable_external_providers: bool = True
     search_provider: SearchProviderName = "firecrawl"
     page_provider: PageProviderName = "firecrawl"
-    provider_timeout_seconds: int = Field(default=10, ge=1, le=120)
+    provider_timeout_seconds: int = Field(default=30, ge=1, le=120)
 
     llm_provider: LLMProviderName = "groq"
     llm_fallbacks: list[LLMProviderName] = Field(

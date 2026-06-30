@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from radar.scraping.adapters import (
+    DuckDuckGoSearchAdapter,
     FirecrawlPageAdapter,
     FirecrawlSearchAdapter,
     PlaywrightPageAdapter,
@@ -21,6 +22,7 @@ def build_web_collector(settings: RadarSettings | None = None) -> WebCollector:
         return StaticSeedCollector()
 
     page_adapter = _build_page_adapter(active_settings)
+
     if active_settings.search_provider == "firecrawl":
         return SearchBackedCollector(
             search_provider=FirecrawlSearchAdapter(settings=active_settings),
@@ -35,11 +37,18 @@ def build_web_collector(settings: RadarSettings | None = None) -> WebCollector:
             page_provider=page_adapter,
         )
 
+    if active_settings.search_provider == "duckduckgo":
+        return SearchBackedCollector(
+            search_provider=DuckDuckGoSearchAdapter(),
+            page_provider=page_adapter,
+        )
+
     raise ProviderSelectionError(
         "Unsupported provider combination: "
         f"search_provider={active_settings.search_provider}, "
         f"page_provider={active_settings.page_provider}. "
-        "Use fixture/fixture for offline tests or firecrawl/playwright for external collection."
+        "Use fixture/fixture for offline tests, firecrawl, duckduckgo, or serpapi for search, "
+        "and firecrawl or playwright for page collection."
     )
 
 
