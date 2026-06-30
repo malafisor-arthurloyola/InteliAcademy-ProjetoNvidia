@@ -29,7 +29,13 @@ def collect_sources_with_errors(
 
     detailed_collect = getattr(active_collector, "collect_with_errors", None)
     if callable(detailed_collect):
-        sources, errors = detailed_collect(plan)
+        import traceback as _tb
+        try:
+            sources, errors = detailed_collect(plan)
+        except Exception:
+            with open(r"C:\Users\Inteli\AppData\Local\Temp\opencode\scraper_error.txt", "w") as _f:
+                _tb.print_exc(file=_f)
+            raise
         if tracker:
             if errors:
                 tracker.set_detail(

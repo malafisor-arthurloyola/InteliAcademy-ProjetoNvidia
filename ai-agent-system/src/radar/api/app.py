@@ -240,7 +240,8 @@ def _run_pipeline_background(run_id: int, query: str, tracker: PipelineTracker, 
         _persist_run_result(run_id, result)
     except Exception as exc:
         import logging
-        logging.getLogger("radar").error("Pipeline run %d failed: %s", run_id, exc)
+        import traceback
+        logging.getLogger("radar").error("Pipeline run %d failed: %s\n%s", run_id, exc, traceback.format_exc())
         update_run_status(run_id, "failed")
     finally:
         set_tracker(None)

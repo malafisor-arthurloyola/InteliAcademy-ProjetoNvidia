@@ -1773,3 +1773,49 @@ npm run lint -> falha global por Prettier em muitos arquivos nao relacionados; a
 3. Implementar Discovery/Radar em lote para evitar busca manual empresa por empresa.
 4. Corrigir baseline global do `npm run lint`/Prettier em uma tarefa separada para evitar diffs gigantes.
 ```
+
+---
+
+## 2026-06-30 — Migração DuckDuckGo (ddgs) e estabilização do search provider
+
+### Problema
+
+Firecrawl atingiu o limite de créditos gratuito (`Payment Required`). Foi migrado para DuckDuckGo (search) + Playwright (scraping), mas o pacote `duckduckgo_search` original sofria rate limit do Bing após poucas requisições, retornando 0 resultados.
+
+### O que foi feito
+
+- **Pacote substituído**: `duckduckgo_search` → `ddgs` (mesma API, versão mais estável com rate limit mais brando)
+- **Sleep aumentado**: 1s → 2s entre queries no `DuckDuckGoSearchAdapter`
+- **Teste real com Fintalk**: pipeline rodou completa sem rate limit
+
+### Resultado
+
+| Métrica | Antes (duckduckgo_search) | Depois (ddgs) |
+|---|---|---|
+| Rate limit após N queries | ~3-5 | ✅ sem bloqueio |
+| Fontes coletadas (Fintalk) | 0 (fallback) | 4 |
+| Pipeline completa | ❌ | ✅ (82s) |
+
+### Pipeline executada (Run #3)
+
+1. `search_planner` → 7 queries planejadas ✅
+2. `scraper` → 4 fontes coletadas via DuckDuckGo ✅
+3. `extractor` → 1 claim extraída ✅
+4. `validator` → 0 aprovadas (evidência genérica) ✅
+5. `classifier` → idle (sem evidências validadas)
+6. `nvidia_rag` → idle
+7. `recommendation` → idle
+8. `briefing` → gerado com caveats ✅
+
+### Diagnóstico
+
+O **rate limit foi resolvido**, mas a **qualidade da busca** ainda é o gargalo: as queries genéricas (`startup brasileira de IA para call center`) retornam páginas sobre "o que é startup" em vez de páginas específicas da Fintalk. O Search Planner precisa ser melhorado para incluir o nome da startup nos termos de busca.
+
+### Próximos passos
+
+```text
+1. Melhorar Search Planner para incluir startup_name e domínios específicos nas queries
+2. Alternativa futura: SearXNG via Docker (mais robusto que DuckDuckGo)
+3. Merge briefing-v2 → main
+4. Criar branch radar-mode para varredura automática
+```

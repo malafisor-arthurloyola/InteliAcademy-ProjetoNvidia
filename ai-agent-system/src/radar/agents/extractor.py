@@ -152,6 +152,7 @@ def _is_relevant_paragraph(text: str) -> bool:
 def extract_startups_and_claims(state: RadarState) -> tuple[list[StartupProfile], list[EvidenceClaim]]:
     sources = state.get("sources", [])
     query = state.get("query", "Unknown startup")
+    known_name = state.get("startup_name")
     claims: list[EvidenceClaim] = []
 
     seen_texts: set[str] = set()
@@ -177,12 +178,12 @@ def extract_startups_and_claims(state: RadarState) -> tuple[list[StartupProfile]
                     )
                 )
 
-    profile = _build_profile(query, sources, claims)
+    profile = _build_profile(query, sources, claims, known_name)
     return [profile], claims
 
 
 def _build_profile(
-    query: str, sources: list[SourceDocument], claims: list[EvidenceClaim]
+    query: str, sources: list[SourceDocument], claims: list[EvidenceClaim], known_name: str | None = None
 ) -> StartupProfile:
     all_text = " ".join(s.text for s in sources if s.text)
 
@@ -192,27 +193,28 @@ def _build_profile(
         try:
             if tracker:
                 tracker.set_detail("extractor", "Extraindo dados via Groq LLM...")
-            return _llm_extract(query, sources, claims)
+            return _llm_extract(query, sources, claims, known_name)
         except Exception:
             if tracker:
                 tracker.set_detail("extractor", "LLM falhou, usando extração por regex...")
 
     if tracker:
         tracker.set_detail("extractor", "Extraindo dados via regex e regras...")
-    return _deterministic_extract(query, all_text, sources, claims)
+    return _deterministic_extract(query, all_text, sources, claims, known_name)
 
 
 def _llm_extract(
-    query: str, sources: list[SourceDocument], claims: list[EvidenceClaim]
+    query: str, sources: list[SourceDocument], claims: list[EvidenceClaim], known_name: str | None = None
 ) -> StartupProfile:
     combined_text = "\n\n---\n\n".join(
         f"[{s.source_type}] {s.title}\n{s.text[:2000]}"
         for s in sources if s.text
     )
 
+    startup_hint = known_name or query
     result = run_llm_with_fallback(
         system_prompt=EXTRACTION_PROMPT,
-        user_prompt=f"Startup: {query}\n\nCollected text:\n{combined_text[:8000]}",
+        user_prompt=f"Startup: {startup_hint}\n\nCollected text:\n{combined_text[:8000]}",
     )
 
     parsed = _parse_llm_json(result)
@@ -222,7 +224,7 @@ def _llm_extract(
     technologies = parsed.get("technologies") or []
     ai_claims = [c for c in claims if c.claim_type == "ai_usage"]
     sector = _text_or_none(parsed.get("sector"))
-    startup_name = _text_or_none(parsed.get("name")) or query
+    startup_name = _text_or_none(parsed.get("name")) or known_name or query
     usage_summary = parsed.get("ai_usage_summary") or _summarize_ai_usage(ai_claims, technologies, sector)
 
     return StartupProfile(
@@ -239,7 +241,7 @@ def _llm_extract(
 
 
 def _deterministic_extract(
-    query: str, all_text: str, sources: list[SourceDocument], claims: list[EvidenceClaim]
+    query: str, all_text: str, sources: list[SourceDocument], claims: list[EvidenceClaim], known_name: str | None = None
 ) -> StartupProfile:
     sector = _extract_sector(all_text)
     product = _extract_product(all_text)
@@ -251,7 +253,7 @@ def _deterministic_extract(
     usage_summary = _summarize_ai_usage(ai_claims, technologies, sector)
 
     return StartupProfile(
-        name=query,
+        name=known_name or query,
         sector=sector,
         product=product,
         description="Perfil da startup montado a partir de evidencias publicas coletadas.",

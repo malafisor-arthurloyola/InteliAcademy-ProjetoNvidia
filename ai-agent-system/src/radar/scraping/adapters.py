@@ -149,7 +149,7 @@ class PlaywrightPageAdapter:
 
 
 class ConfiguredSerpApiSearchAdapter:
-    """Boundary for future SerpAPI calls, disabled unless explicitly configured."""
+    """Search the web via SerpAPI (Google backend)."""
 
     provider = "serpapi"
 
@@ -159,9 +159,62 @@ class ConfiguredSerpApiSearchAdapter:
     def search(self, plan: SearchPlan) -> list[SourceCandidate]:
         _ensure_external_provider_enabled(self._settings, self.provider)
         _ensure_api_key(self._settings.serpapi_api_key, self.provider)
-        raise NotImplementedError(
-            "SerpAPI network calls are intentionally not implemented until external "
-            "API usage is explicitly authorized."
+
+        import urllib.request
+        import urllib.parse
+        import json
+
+        candidates = []
+        seen_urls: set[str] = set()
+        search_queries = _search_queries_for_plan(plan)
+        search_queries = _prioritize_ia_queries(search_queries)
+        per_query_limit = max(5, 15 // len(search_queries))
+
+        for search_query in search_queries:
+            try:
+                params = urllib.parse.urlencode({
+                    "q": search_query,
+                    "api_key": self._settings.serpapi_api_key,
+                    "engine": "google",
+                    "num": per_query_limit,
+                    "hl": "pt",
+                })
+                url = f"https://serpapi.com/search?{params}"
+                req = urllib.request.Request(url, headers={"User-Agent": "radar/1.0"})
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    data = json.loads(resp.read().decode())
+
+                results = data.get("organic_results") or []
+                for item in results:
+                    link = item.get("link") or item.get("url") or ""
+                    if not link or link in seen_urls:
+                        continue
+                    seen_urls.add(link)
+                    candidates.append({
+                        "url": link,
+                        "title": item.get("title", ""),
+                        "description": item.get("snippet", ""),
+                        "source_type": _infer_source_type_from_url(link, plan.query, plan.keywords),
+                        "rank": len(candidates) + 1,
+                    })
+            except Exception as exc:
+                import traceback
+                print(f"[SERPAPI DEBUG] Query '{search_query}' failed: {type(exc).__name__}: {exc}")
+                traceback.print_exc()
+                continue
+            import time
+            time.sleep(0.5)
+        print(f"[SERPAPI DEBUG] Total candidates: {len(candidates)}")
+
+        return normalize_search_result_payloads(
+            [{
+                "link": c["url"],
+                "title": c["title"],
+                "snippet": c["description"],
+                "kind": c["source_type"],
+                "rank": c["rank"],
+            } for c in candidates],
+            provider=self.provider,
         )
 
 
@@ -234,7 +287,7 @@ class DuckDuckGoSearchAdapter:
     def search(self, plan: SearchPlan) -> list[SourceCandidate]:
         _ensure_external_provider_enabled(get_settings(), self.provider)
 
-        from duckduckgo_search import DDGS
+        from ddgs import DDGS
 
         candidates = []
         seen_urls: set[str] = set()
@@ -244,9 +297,9 @@ class DuckDuckGoSearchAdapter:
 
         for search_query in search_queries:
             try:
-                results = DDGS().text(keywords=search_query, max_results=per_query_limit)
+                results = DDGS().text(search_query, max_results=per_query_limit)
                 import time
-                time.sleep(1)
+                time.sleep(2)
             except Exception:
                 continue
 
@@ -259,7 +312,7 @@ class DuckDuckGoSearchAdapter:
                     "url": url,
                     "title": item.get("title", ""),
                     "description": item.get("body", item.get("snippet", "")),
-                    "source_type": _infer_source_type_from_url(url, plan.query),
+                    "source_type": _infer_source_type_from_url(url, plan.query, plan.keywords),
                     "rank": len(candidates) + 1,
                 })
 
@@ -382,11 +435,16 @@ def _search_queries_for_plan(plan: SearchPlan, max_queries: int = 3) -> list[str
     return queries
 
 
-def _infer_source_type_from_url(url: str, query: str | None = None) -> str:
+def _infer_source_type_from_url(url: str, query: str | None = None, extra_terms: list[str] | None = None) -> str:
     url_lower = url.lower()
     parsed = urlparse(url_lower)
     domain = parsed.netloc.removeprefix("www.")
-    query_terms = _meaningful_query_terms(query)
+    query_terms = list(_meaningful_query_terms(query))
+    if extra_terms:
+        for t in extra_terms:
+            cleaned = "".join(c for c in t.lower() if c.isalnum())
+            if len(cleaned) >= 3 and cleaned not in query_terms:
+                query_terms.append(cleaned)
 
     if any(d in url_lower for d in ("crunchbase", "pitchbook", "startupbase", "distrito")):
         return "startup_directory"

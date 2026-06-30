@@ -53,7 +53,7 @@ def inspect_provider_setup(settings: RadarSettings | None = None) -> ProviderPre
             messages=("Using deterministic fixture providers; no external API calls are required.",),
         )
 
-    if search_provider in ("serpapi", "firecrawl") and page_provider in ("firecrawl", "playwright"):
+    if search_provider in ("serpapi", "firecrawl", "duckduckgo") and page_provider in ("firecrawl", "playwright"):
         return _inspect_external_stack(active_settings)
 
     return ProviderPreflight(

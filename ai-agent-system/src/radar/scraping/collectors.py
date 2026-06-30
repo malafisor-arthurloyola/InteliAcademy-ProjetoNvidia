@@ -1,10 +1,13 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Protocol
 
 from radar.schemas import PipelineError, SearchPlan, SourceCandidate, SourceDocument
 from radar.scraping.normalizers import normalize_source_payloads
+
+MAX_CANDIDATES = 8
 
 DOMAIN_BLOCKLIST: set[str] = {
     "youtube.com", "youtu.be",
@@ -84,23 +87,30 @@ class SearchBackedCollector(WebCollector):
             ]
 
         candidates = _filter_relevant_candidates(candidates, plan)
+        candidates = candidates[:MAX_CANDIDATES]
 
         sources: list[SourceDocument] = []
         errors: list[PipelineError] = []
-        for candidate in candidates:
-            try:
-                sources.append(self._page_provider.fetch(candidate))
-            except Exception as exc:
-                errors.append(
-                    PipelineError(
-                        step="scraper.fetch",
-                        message=str(exc),
-                        recoverable=True,
-                        source_url=str(candidate.url),
-                        provider=_provider_name(self._page_provider),
-                        error_type=type(exc).__name__,
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            future_to_candidate = {
+                executor.submit(self._page_provider.fetch, candidate): candidate
+                for candidate in candidates
+            }
+            for future in as_completed(future_to_candidate):
+                candidate = future_to_candidate[future]
+                try:
+                    sources.append(future.result())
+                except Exception as exc:
+                    errors.append(
+                        PipelineError(
+                            step="scraper.fetch",
+                            message=str(exc),
+                            recoverable=True,
+                            source_url=str(candidate.url),
+                            provider=_provider_name(self._page_provider),
+                            error_type=type(exc).__name__,
+                        )
                     )
-                )
         return sources, errors
 
 
@@ -150,9 +160,26 @@ def _filter_relevant_candidates(
         if has_query_match:
             return True
 
+        keyword_match = any(
+            term in domain or term in combined
+            for term in _name_keywords(plan)
+        )
+        if keyword_match:
+            return True
+
         return False
 
     return [c for c in candidates if is_relevant(c)]
+
+
+def _name_keywords(plan: SearchPlan) -> list[str]:
+    stopwords = {"ai", "ia", "de", "do", "da", "dos", "das", "e", "em", "o", "os", "a", "as", "para", "com", "que", "startup", "startups", "empresa", "empresas"}
+    keywords = []
+    for kw in plan.keywords:
+        cleaned = "".join(c for c in kw.lower() if c.isalnum())
+        if len(cleaned) >= 3 and cleaned not in stopwords and cleaned not in keywords:
+            keywords.append(cleaned)
+    return keywords
 
 
 def _domain_matches_any(domain: str, patterns: set[str] | tuple[str, ...]) -> bool:
