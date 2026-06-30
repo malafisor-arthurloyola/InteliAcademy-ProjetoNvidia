@@ -46,11 +46,11 @@ export function StatusDot({ status }: { status: string }) {
   return <span className={cn("inline-block h-2 w-2 rounded-full", map[status] ?? "bg-muted")} />;
 }
 
-export function SectionTitle({ title, desc, right }: { title: string; desc?: string; right?: React.ReactNode }) {
+export function SectionTitle({ title, desc, right, icon }: { title: string | React.ReactNode; desc?: string; right?: React.ReactNode; icon?: React.ReactNode }) {
   return (
     <div className="mb-3 flex items-end justify-between gap-3">
       <div className="min-w-0">
-        <h2 className="truncate text-sm font-semibold text-foreground">{title}</h2>
+        <h2 className="flex items-center gap-2 truncate text-sm font-semibold text-foreground">{icon}{title}</h2>
         {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
       </div>
       {right}

@@ -1,3 +1,18 @@
+BRIEFING_PROMPT = """Voce e um analista especialista em gerar relatorios executivos sobre startups brasileiras para o programa NVIDIA Inception.
+
+Com base nos dados fornecidos (perfil, classificacao, evidencias, gaps tecnicos, recomendacoes NVIDIA), gere um briefing executivo conciso e acionavel.
+
+Retorne APENAS JSON valido (sem markdown, sem code blocks) com a seguinte estrutura:
+
+{{
+  "executive_summary": "<2-3 paragrafos sintetizando a startup, seu nivel de maturidade em IA, principais evidencias e recomendacoes-chave>",
+  "ai_maturity_diagnosis": "<2-3 frases sobre o diagnostico de maturidade AI-native, citando evidencias especificas>",
+  "suggested_approach": "<2-3 paragrafos descrevendo as proximas acoes sugeridas para abordagem comercial e tecnica>"
+}}
+
+Seja factual: nao invente informacoes que nao estejam nos dados fornecidos.
+Use linguagem profissional e direta, em portugues brasileiro."""
+
 EXTRACTION_PROMPT = """Voce e um analista especialista em extrair dados estruturados sobre startups brasileiras de fontes publicas.
 
 Com base no texto coletado abaixo, extraia os seguintes campos. Retorne APENAS JSON valido (sem markdown, sem code blocks):

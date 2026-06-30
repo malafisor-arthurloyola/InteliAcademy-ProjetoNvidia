@@ -480,6 +480,15 @@ def get_run_recommendations(run_id: int) -> list[dict[str, Any]]:
         return [dict(r) for r in rows]
 
 
+def save_run_briefing(run_id: int, briefing_json: str) -> None:
+    with get_connection() as conn:
+        try:
+            conn.execute("ALTER TABLE runs ADD COLUMN briefing TEXT")
+        except Exception:
+            pass
+        conn.execute("UPDATE runs SET briefing = ? WHERE id = ?", (briefing_json, run_id))
+
+
 _STARTUP_SELECT = """
     SELECT s.*,
       ROUND(

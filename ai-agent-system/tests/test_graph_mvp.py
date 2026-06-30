@@ -6,7 +6,7 @@ def test_graph_generates_limited_briefing_when_evidence_is_weak() -> None:
 
     result = graph.invoke({"query": "startup brasileira de IA", "collection_attempts": 0})
 
-    assert result["briefing"].classification == "Inconclusivo"
+    assert result["briefing"].classification_label == "Inconclusivo"
     assert result.get("recommendations", []) == []
     assert result["review_required"] is True
 

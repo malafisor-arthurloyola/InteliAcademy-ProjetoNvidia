@@ -45,6 +45,7 @@ from radar.database import (  # noqa: E402
     save_evidence_claim,
     save_recommendation,
     save_run,
+    save_run_briefing,
     save_source_document,
     save_startup,
     save_validation,
@@ -150,6 +151,10 @@ def _persist_run_result(run_id: int, result: dict[str, Any]) -> None:  # noqa: C
 
         for rec in result.get("recommendations", []):
             save_recommendation(run_id, rec.model_dump())
+
+        briefing = result.get("briefing")
+        if briefing:
+            save_run_briefing(run_id, json.dumps(jsonable_encoder(briefing.model_dump())))
 
         update_run_status(run_id, "completed")
     else:
@@ -273,6 +278,12 @@ def get_run(run_id: int) -> dict[str, Any]:
     run["recommendations"] = get_run_recommendations(run_id)
     run["steps"] = get_run_steps(run_id)
     run["validation"] = get_run_validation(run_id)
+    if run.get("briefing"):
+        import json
+        try:
+            run["briefing"] = json.loads(run["briefing"])
+        except Exception:
+            pass
     return run
 
 

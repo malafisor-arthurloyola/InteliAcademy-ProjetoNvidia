@@ -95,6 +95,31 @@ export interface ValidationRecord {
   requires_human_review: boolean;
 }
 
+export interface BriefingSectionRecord {
+  title: string;
+  content: string;
+  evidence_ids?: string[];
+}
+
+export interface BriefingRecord {
+  id: string;
+  title: string;
+  startup_name: string;
+  startup_sector: string | null;
+  generated_at: string;
+  classification_label: string;
+  classification_confidence: number;
+  classification_rationale: string;
+  executive_summary: string;
+  ai_maturity_diagnosis: BriefingSectionRecord;
+  evidence_summary: BriefingSectionRecord;
+  technical_gaps: BriefingSectionRecord;
+  nvidia_recommendations_section: BriefingSectionRecord;
+  caveats: string[];
+  suggested_approach: BriefingSectionRecord;
+  recommendations: RecommendationRecord[];
+}
+
 export interface RunDetail {
   id: number;
   query: string;
@@ -105,6 +130,7 @@ export interface RunDetail {
   recommendations: RecommendationRecord[];
   steps: PipelineStepRecord[];
   validation: ValidationRecord | null;
+  briefing: BriefingRecord | null;
 }
 
 export interface StartupRecord {

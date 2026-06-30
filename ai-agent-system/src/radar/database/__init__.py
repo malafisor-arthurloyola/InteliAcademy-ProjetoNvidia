@@ -21,6 +21,7 @@ from radar.database.repository import (
     save_evidence_claim,
     save_recommendation,
     save_run,
+    save_run_briefing,
     save_source_document,
     save_startup,
     save_validation,
@@ -62,5 +63,6 @@ __all__ = [
     "get_runs_by_startup",
     "get_all_startups",
     "get_startup_by_id",
+    "save_run_briefing",
 ]
 

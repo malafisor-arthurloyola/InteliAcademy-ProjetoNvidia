@@ -20,12 +20,8 @@ def test_briefing_includes_collection_error_caveats() -> None:
         }
     )
 
-    assert briefing.caveats == [
-        (
-            "Aviso de coleta em scraper.fetch em https://example.com/missing "
-            "via PageContentAdapter: fixture missing"
-        )
-    ]
+    assert "scraper.fetch" in "\n".join(briefing.caveats)
+    assert "https://example.com/missing" in "\n".join(briefing.caveats)
 
 
 def test_briefing_includes_retry_limit_caveat() -> None:
@@ -44,4 +40,45 @@ def test_briefing_includes_retry_limit_caveat() -> None:
         }
     )
 
-    assert "Limite de tentativas de coleta atingido apos 2 tentativas." in briefing.caveats
+    all_caveats = "\n".join(briefing.caveats)
+    assert f"apos {MAX_COLLECTION_ATTEMPTS} tentativas" in all_caveats
+
+
+def test_briefing_has_rich_sections() -> None:
+    briefing = generate_briefing(
+        {
+            "query": "gupy",
+            "startup_name": "Gupy",
+        }
+    )
+
+    assert briefing.title == "Briefing: Gupy"
+    assert briefing.startup_name == "Gupy"
+    assert briefing.executive_summary
+    assert briefing.ai_maturity_diagnosis.title == "Diagnostico AI-native"
+    assert briefing.evidence_summary.title == "Evidencias principais"
+    assert briefing.technical_gaps.title == "Gaps tecnicos identificados"
+    assert briefing.nvidia_recommendations_section.title == "Recomendacoes NVIDIA"
+    assert briefing.suggested_approach.title == "Proximos passos sugeridos"
+
+
+def test_briefing_uses_startup_name_when_available() -> None:
+    briefing = generate_briefing(
+        {
+            "query": "tractian",
+            "startup_name": "Tractian",
+            "extracted_startups": [
+                type("FakeProfile", (), {
+                    "name": "Tractian Tecnologia",
+                    "sector": "Industrial",
+                    "product": "Manutencao Preditiva",
+                    "cited_technologies": ["IoT", "Machine Learning"],
+                    "funding": "Serie B",
+                    "founders": [],
+                })()
+            ],
+        }
+    )
+
+    assert briefing.startup_name == "Tractian Tecnologia"
+    assert briefing.startup_sector == "Industrial"

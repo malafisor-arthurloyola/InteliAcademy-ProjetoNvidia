@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Copy, Database, Download, Save } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Copy, Database, Download, Edit3, Lightbulb, Save, Search, Shield, Target, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { ApiErrorDisplay } from "@/components/api-error-display";
 import { Badge } from "@/components/ui/badge";
@@ -14,8 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MaturityBadge, ScoreBar, SectionTitle } from "@/components/ui-bits";
-import type { ApiError } from "@/lib/api";
+import { MaturityBadge, SectionTitle } from "@/components/ui-bits";
+import type { ApiError, BriefingRecord } from "@/lib/api";
 import {
   findLatestRunForStartup,
   formatDate,
@@ -104,6 +104,7 @@ function BriefingPage() {
     );
   }
 
+  const briefing = runQuery.data?.briefing as BriefingRecord | null;
   const recommendations = runQuery.data?.recommendations ?? [];
   const claims = claimsQuery.data ?? [];
   const sources = sourcesQuery.data ?? [];
@@ -130,6 +131,7 @@ function BriefingPage() {
     recommendations: recommendations.map((rec) => rec.technology),
   });
   const apiOk = healthQuery.data?.status === "ok";
+  const hasBriefing = !!briefing?.executive_summary;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5 p-4 md:p-6">
@@ -139,7 +141,9 @@ function BriefingPage() {
             Briefing Executivo
           </h1>
           <p className="text-xs text-muted-foreground">
-            Documento montado com dados reais da FastAPI local.
+            {hasBriefing
+              ? "Relatorio gerado por IA baseado em evidencias coletadas."
+              : "Documento montado com dados reais da FastAPI local."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -175,7 +179,7 @@ function BriefingPage() {
       <Card className="p-6">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-xl font-semibold text-foreground">
-            {startup.name}
+            {briefing?.startup_name ?? startup.name}
           </h2>
           {maturity ? (
             <MaturityBadge value={maturity} />
@@ -184,7 +188,8 @@ function BriefingPage() {
           )}
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          {unavailable(startup.sector)} - {unavailable(startup.product)} -
+          {unavailable(briefing?.startup_sector ?? startup.sector)} -{" "}
+          {unavailable(startup.product)} -
           Funding: {unavailable(startup.funding)}
         </p>
         <p className="mt-1 text-[11px] text-muted-foreground">
@@ -203,102 +208,17 @@ function BriefingPage() {
 
         <div className="my-6 h-px bg-border" />
 
-        <SectionTitle title="1. Resumo" />
-        <p className="text-sm leading-relaxed text-foreground">
-          {startup.description ??
-            startup.ai_usage_summary ??
-            "Resumo ainda nao disponivel na API."}
-        </p>
-
-        <div className="mt-5">
-          <SectionTitle title="2. Diagnostico AI-native" />
-          <p className="text-sm leading-relaxed text-foreground">
-            {startup.classification_rationale ??
-              "Classificacao ainda nao disponivel."}
-          </p>
-        </div>
-
-        <div className="mt-5">
-          <SectionTitle title="3. Evidencias principais" />
-          {claims.length === 0 ? (
-            <EmptyText text="Nenhuma claim real associada ao ultimo run." />
-          ) : (
-            <ul className="space-y-1.5">
-              {claims.slice(0, 5).map((claim, index) => (
-                <li key={claim.id} className="text-xs text-foreground">
-                  <span className="font-medium">E{index + 1}</span> -{" "}
-                  <span className="text-muted-foreground">
-                    [{claim.claim_type}]
-                  </span>{" "}
-                  {claim.text}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="mt-5">
-          <SectionTitle title="4. Sinais tecnicos" />
-          <div className="flex flex-wrap gap-1.5">
-            {technologies.length === 0 ? (
-              <Badge variant="outline">Nao disponivel</Badge>
-            ) : (
-              technologies.map((tech) => (
-                <Badge key={tech} variant="outline" className="text-[10px]">
-                  {tech}
-                </Badge>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <SectionTitle title="5. Recomendacoes NVIDIA" />
-          {recommendations.length === 0 ? (
-            <EmptyText text="Nenhuma recomendacao real persistida para este run." />
-          ) : (
-            <ul className="space-y-2">
-              {recommendations.map((rec) => (
-                <li
-                  key={rec.id}
-                  className="rounded-md border border-border p-3"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-foreground">
-                      {rec.technology}
-                    </span>
-                    <Badge variant="outline" className="text-[10px]">
-                      Prioridade {rec.priority}
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px]">
-                      Complexidade {rec.implementation_complexity}
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-xs text-foreground">
-                    <span className="font-medium">Tecnico:</span>{" "}
-                    {rec.technical_justification}
-                  </p>
-                  <p className="text-xs text-foreground">
-                    <span className="font-medium">Negocio:</span>{" "}
-                    {rec.business_justification}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="mt-5">
-          <SectionTitle title="6. Fontes disponiveis" />
-          {sources.length === 0 ? (
-            <EmptyText text="Nenhuma fonte associada ao ultimo run." />
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              {sources.length} fonte(s) reais associadas. Primeira fonte:{" "}
-              {sources[0].domain}
-            </p>
-          )}
-        </div>
+        {hasBriefing ? (
+          <BriefingContent briefing={briefing} claims={claims} sources={sources} />
+        ) : (
+          <LegacyBriefingContent
+            startup={startup}
+            claims={claims}
+            sources={sources}
+            technologies={technologies}
+            recommendations={recommendations}
+          />
+        )}
 
         <div className="mt-6 flex flex-wrap gap-2">
           <Button
@@ -330,11 +250,216 @@ function BriefingPage() {
   );
 }
 
+function BriefingContent({
+  briefing,
+}: {
+  briefing: BriefingRecord;
+  claims: { id: string; text: string; claim_type: string }[];
+  sources: { id: string; domain: string }[];
+}) {
+  const sections = [
+    { icon: <TrendingUp className="h-4 w-4 text-muted-foreground" />, data: briefing.executive_summary, title: "Resumo Executivo" },
+    { icon: <Shield className="h-4 w-4 text-muted-foreground" />, section: briefing.ai_maturity_diagnosis },
+    { icon: <Search className="h-4 w-4 text-muted-foreground" />, section: briefing.evidence_summary },
+    { icon: <Target className="h-4 w-4 text-muted-foreground" />, section: briefing.technical_gaps },
+    { icon: <Lightbulb className="h-4 w-4 text-muted-foreground" />, section: briefing.nvidia_recommendations_section },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {sections.map((s) => {
+        const content = s.data ?? s.section?.content ?? "";
+        const sectionTitle = s.section?.title ?? s.title ?? "";
+        if (!content) return null;
+        return (
+          <div key={sectionTitle}>
+            <SectionTitle title={sectionTitle} icon={s.icon} />
+            <div className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+              {content}
+            </div>
+          </div>
+        );
+      })}
+
+      {briefing.caveats.length > 0 && (
+        <div>
+          <SectionTitle title="Ressalvas" icon={<AlertTriangle className="h-4 w-4 text-amber-500" />} />
+          <ul className="mt-2 space-y-1">
+            {briefing.caveats.map((caveat, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-xs text-muted-foreground">
+                <span className="mt-1 block h-1 w-1 shrink-0 rounded-full bg-muted-foreground" />
+                {caveat}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {briefing.suggested_approach?.content && (
+        <div>
+          <SectionTitle title={briefing.suggested_approach.title} icon={<Edit3 className="h-4 w-4 text-muted-foreground" />} />
+          <div className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            {briefing.suggested_approach.content}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LegacyBriefingContent({
+  startup,
+  claims,
+  sources,
+  technologies,
+  recommendations,
+}: {
+  startup: {
+    name: string;
+    sector: string | null;
+    product: string | null;
+    description: string | null;
+    ai_usage_summary: string | null;
+    classification_label: string | null;
+    classification_confidence: number | null;
+    classification_rationale: string | null;
+    funding: string | null;
+  };
+  claims: { id: string; text: string; claim_type: string }[];
+  sources: { domain: string }[];
+  technologies: string[];
+  recommendations: {
+    id: string;
+    technology: string;
+    priority: string;
+    implementation_complexity: string;
+    technical_justification: string;
+    business_justification: string;
+  }[];
+}) {
+  const maturity = maturityLabel(startup.classification_label);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <SectionTitle title="Resumo Executivo" icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />} />
+        <p className="mt-2 text-sm leading-relaxed text-foreground">
+          {startup.description ??
+            startup.ai_usage_summary ??
+            "Resumo ainda nao disponivel na API."}
+        </p>
+      </div>
+
+      <div>
+        <SectionTitle title="Diagnostico AI-native" icon={<Shield className="h-4 w-4 text-muted-foreground" />} />
+        {maturity ? (
+          <div className="mt-2 flex items-center gap-2">
+            <MaturityBadge value={maturity} />
+            <span className="text-xs text-muted-foreground">
+              Confianca: {scoreFromConfidence(startup.classification_confidence)}%
+            </span>
+          </div>
+        ) : null}
+        <p className="mt-2 text-sm leading-relaxed text-foreground">
+          {startup.classification_rationale ??
+            "Classificacao ainda nao disponivel."}
+        </p>
+      </div>
+
+      <div>
+        <SectionTitle title="Evidencias principais" icon={<Search className="h-4 w-4 text-muted-foreground" />} />
+        {claims.length === 0 ? (
+          <p className="mt-2 rounded-md border border-dashed border-border p-4 text-xs text-muted-foreground">
+            Nenhuma claim real associada ao ultimo run.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {claims.slice(0, 5).map((claim, index) => (
+              <li key={claim.id} className="text-xs text-foreground">
+                <span className="font-medium">E{index + 1}</span> -{" "}
+                <span className="text-muted-foreground">
+                  [{claim.claim_type}]
+                </span>{" "}
+                {claim.text}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div>
+        <SectionTitle title="Sinais tecnicos" icon={<Target className="h-4 w-4 text-muted-foreground" />} />
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {technologies.length === 0 ? (
+            <Badge variant="outline">Nao disponivel</Badge>
+          ) : (
+            technologies.map((tech) => (
+              <Badge key={tech} variant="outline" className="text-[10px]">
+                {tech}
+              </Badge>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div>
+        <SectionTitle title="Recomendacoes NVIDIA" icon={<Lightbulb className="h-4 w-4 text-muted-foreground" />} />
+        {recommendations.length === 0 ? (
+          <p className="mt-2 rounded-md border border-dashed border-border p-4 text-xs text-muted-foreground">
+            Nenhuma recomendacao real persistida para este run.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {recommendations.map((rec) => (
+              <li
+                key={rec.id}
+                className="rounded-md border border-border p-3"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-foreground">
+                    {rec.technology}
+                  </span>
+                  <Badge variant="outline" className="text-[10px]">
+                    Prioridade {rec.priority}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px]">
+                    Complexidade {rec.implementation_complexity}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs text-foreground">
+                  <span className="font-medium">Tecnico:</span>{" "}
+                  {rec.technical_justification}
+                </p>
+                <p className="text-xs text-foreground">
+                  <span className="font-medium">Negocio:</span>{" "}
+                  {rec.business_justification}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ScorePanel({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
       <ScoreBar value={value} />
+    </div>
+  );
+}
+
+function ScoreBar({ value }: { value: number }) {
+  const clamped = Math.min(100, Math.max(0, value));
+  return (
+    <div className="mt-0.5 h-2 w-full overflow-hidden rounded-full bg-muted">
+      <div
+        className="h-full rounded-full bg-foreground transition-all duration-300"
+        style={{ width: `${clamped}%` }}
+      />
     </div>
   );
 }
@@ -350,14 +475,6 @@ function BriefingSkeleton() {
           <Skeleton className="h-40 w-full" />
         </div>
       </Card>
-    </div>
-  );
-}
-
-function EmptyText({ text }: { text: string }) {
-  return (
-    <div className="rounded-md border border-dashed border-border p-4 text-xs text-muted-foreground">
-      {text}
     </div>
   );
 }
